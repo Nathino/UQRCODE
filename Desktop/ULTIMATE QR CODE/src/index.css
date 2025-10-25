@@ -1,0 +1,86 @@
+/* Import custom animations */
+@import './styles/animations.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply antialiased;
+  }
+}
+
+:root {
+  color-scheme: light dark;
+}
+
+/* QR Code Animations */
+@keyframes qr-fade {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+@keyframes qr-scan {
+  0% {
+    clip-path: polygon(0 0, 100% 0, 100% 0, 0 0);
+  }
+  50% {
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);
+  }
+  100% {
+    clip-path: polygon(0 100%, 100% 100%, 100% 100%, 0 100%);
+  }
+}
+
+@keyframes qr-rotate {
+  0% { transform: perspective(1000px) rotateY(0deg); }
+  100% { transform: perspective(1000px) rotateY(360deg); }
+}
+
+/* QR Code Gradient Styles */
+.qr-gradient {
+  position: relative;
+  overflow: hidden;
+}
+
+.qr-gradient::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    var(--gradient-type, to right),
+    var(--gradient-colors, #6366f1, #8b5cf6)
+  );
+  mask: url(#qr-mask);
+  -webkit-mask: url(#qr-mask);
+  opacity: 0.8;
+  mix-blend-mode: multiply;
+}
+
+/* QR Code Style Variations */
+.qr-dots canvas {
+  border-radius: 50%;
+}
+
+.qr-rounded canvas {
+  border-radius: 12px;
+}
+
+.qr-classy canvas {
+  border-radius: 8px;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+}
+
+.qr-edges canvas {
+  clip-path: polygon(
+    0 10px,
+    10px 0,
+    calc(100% - 10px) 0,
+    100% 10px,
+    100% calc(100% - 10px),
+    calc(100% - 10px) 100%,
+    10px 100%,
+    0 calc(100% - 10px)
+  );
+}
