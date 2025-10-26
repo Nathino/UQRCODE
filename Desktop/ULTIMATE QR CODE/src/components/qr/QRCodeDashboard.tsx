@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
+import { ConfirmationDialog } from '@/components/ui/ConfirmationDialog';
 import { QRCodeStorage, SavedQRCode, QRCodeStats } from '@/lib/qrStorage';
 import { QRType } from './types';
 import { generateQRData } from './utils';
@@ -36,6 +37,15 @@ export function QRCodeDashboard({ userId, onQRCodeSelect, onBack }: QRCodeDashbo
   const [selectedCode, setSelectedCode] = useState<SavedQRCode | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [showStats, setShowStats] = useState(false);
+  const [confirmationDialog, setConfirmationDialog] = useState<{
+    show: boolean;
+    qrCodeId: string | null;
+    qrCodeName: string;
+  }>({
+    show: false,
+    qrCodeId: null,
+    qrCodeName: ''
+  });
 
   // Load QR codes on mount
   useEffect(() => {
@@ -88,15 +98,26 @@ export function QRCodeDashboard({ userId, onQRCodeSelect, onBack }: QRCodeDashbo
     }
   };
 
-  const handleDeleteQRCode = async (qrCodeId: string) => {
-    if (!confirm('Are you sure you want to delete this QR code?')) return;
+  const handleDeleteQRCode = (qrCodeId: string) => {
+    const qrCode = qrCodes.find(code => code.id === qrCodeId);
+    if (!qrCode) return;
+
+    setConfirmationDialog({
+      show: true,
+      qrCodeId,
+      qrCodeName: qrCode.name
+    });
+  };
+
+  const confirmDeleteQRCode = async () => {
+    if (!confirmationDialog.qrCodeId) return;
 
     setIsLoading(true);
     try {
-      const success = QRCodeStorage.deleteQRCode(userId, qrCodeId);
+      const success = QRCodeStorage.deleteQRCode(userId, confirmationDialog.qrCodeId);
       if (success) {
         loadQRCodes();
-        if (selectedCode?.id === qrCodeId) {
+        if (selectedCode?.id === confirmationDialog.qrCodeId) {
           setSelectedCode(null);
         }
       }
@@ -104,6 +125,11 @@ export function QRCodeDashboard({ userId, onQRCodeSelect, onBack }: QRCodeDashbo
       console.error('Error deleting QR code:', error);
     } finally {
       setIsLoading(false);
+      setConfirmationDialog({
+        show: false,
+        qrCodeId: null,
+        qrCodeName: ''
+      });
     }
   };
 
@@ -424,6 +450,22 @@ export function QRCodeDashboard({ userId, onQRCodeSelect, onBack }: QRCodeDashbo
           </div>
         )}
       </div>
+
+      {/* Confirmation Dialog */}
+      <ConfirmationDialog
+        show={confirmationDialog.show}
+        onConfirm={confirmDeleteQRCode}
+        onCancel={() => setConfirmationDialog({
+          show: false,
+          qrCodeId: null,
+          qrCodeName: ''
+        })}
+        title="Delete QR Code"
+        message={`Are you sure you want to delete "${confirmationDialog.qrCodeName}"? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        type="danger"
+      />
     </div>
   );
 }
