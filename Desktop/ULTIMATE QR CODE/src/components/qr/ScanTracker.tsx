@@ -4,6 +4,7 @@ import { ScanTracker as ScanTrackerLib } from '@/lib/scanTracker';
 import { generateQRData } from './utils';
 import QRCode from 'qrcode.react';
 import { Button } from '@/components/ui/button';
+import { FloatingNotification } from '@/components/ui/FloatingNotification';
 import { ArrowLeft, ExternalLink, Eye, BarChart3 } from 'lucide-react';
 
 interface ScanTrackerProps {
@@ -22,6 +23,17 @@ export function ScanTracker({ onBack, qrCodeId, userId }: ScanTrackerProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [scanTracked, setScanTracked] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notification, setNotification] = useState<{
+    show: boolean;
+    type: 'success' | 'error' | 'info' | 'warning';
+    title: string;
+    message?: string;
+  }>({
+    show: false,
+    type: 'info',
+    title: '',
+    message: ''
+  });
 
   useEffect(() => {
     if (!finalQrCodeId || !finalUserId) {
@@ -87,7 +99,12 @@ export function ScanTracker({ onBack, qrCodeId, userId }: ScanTrackerProps) {
         break;
       case 'wifi':
         // For WiFi, we can't automatically connect, so show the details
-        alert(`WiFi Network: ${qrData}`);
+        setNotification({
+          show: true,
+          type: 'info',
+          title: 'WiFi Network Details',
+          message: qrData
+        });
         break;
       case 'vcard':
         // For contact QR codes, try to open contact app or show formatted contact
@@ -102,7 +119,12 @@ export function ScanTracker({ onBack, qrCodeId, userId }: ScanTrackerProps) {
           URL.revokeObjectURL(url);
         } catch (error) {
           // Fallback to showing contact info
-          alert(`Contact Information:\n${qrData}`);
+          setNotification({
+            show: true,
+            type: 'info',
+            title: 'Contact Information',
+            message: qrData
+          });
         }
         break;
       case 'event':
@@ -118,7 +140,12 @@ export function ScanTracker({ onBack, qrCodeId, userId }: ScanTrackerProps) {
           URL.revokeObjectURL(url);
         } catch (error) {
           // Fallback to showing event info
-          alert(`Event Information:\n${qrData}`);
+          setNotification({
+            show: true,
+            type: 'info',
+            title: 'Event Information',
+            message: qrData
+          });
         }
         break;
       case 'crypto':
@@ -126,18 +153,38 @@ export function ScanTracker({ onBack, qrCodeId, userId }: ScanTrackerProps) {
         const cryptoInfo = qrData.split(':');
         if (cryptoInfo.length === 2) {
           const [currency, address] = cryptoInfo;
-          alert(`${currency.toUpperCase()} Address:\n${address}\n\nCopy this address to your wallet app.`);
+          setNotification({
+            show: true,
+            type: 'info',
+            title: `${currency.toUpperCase()} Address`,
+            message: `${address}\n\nCopy this address to your wallet app.`
+          });
         } else {
-          alert(`Cryptocurrency Address:\n${qrData}`);
+          setNotification({
+            show: true,
+            type: 'info',
+            title: 'Cryptocurrency Address',
+            message: qrData
+          });
         }
         break;
       case 'text':
         // For text QR codes, show the content
-        alert(qrData);
+        setNotification({
+          show: true,
+          type: 'info',
+          title: 'Text Content',
+          message: qrData
+        });
         break;
       default:
         // For other types, show the data
-        alert(qrData);
+        setNotification({
+          show: true,
+          type: 'info',
+          title: 'QR Code Content',
+          message: qrData
+        });
     }
   };
 
@@ -260,6 +307,15 @@ export function ScanTracker({ onBack, qrCodeId, userId }: ScanTrackerProps) {
           </p>
         </div>
       </div>
+
+      {/* Floating Notification */}
+      <FloatingNotification
+        show={notification.show}
+        onHide={() => setNotification(prev => ({ ...prev, show: false }))}
+        type={notification.type}
+        title={notification.title}
+        message={notification.message}
+      />
     </div>
   );
 }

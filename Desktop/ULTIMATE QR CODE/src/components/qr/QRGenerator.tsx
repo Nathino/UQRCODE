@@ -10,6 +10,7 @@ import { QRCodeDashboard } from './QRCodeDashboard';
 import { DocumentMetadata } from '@/lib/cloudinary';
 import { SavedQRCode, QRCodeStorage } from '@/lib/qrStorage';
 import { useAuth } from '@/hooks/useAuth';
+import { FloatingNotification } from '@/components/ui/FloatingNotification';
 import { QrCode, Smartphone, Wifi, Mail, MapPin, Calendar, CreditCard, FileText, Zap, FolderOpen, Save } from 'lucide-react';
 
 const initialQRConfig: QRConfig = {
@@ -39,6 +40,17 @@ export function QRGenerator() {
   const [qrCodeName, setQrCodeName] = useState('');
   const [showSaveForm, setShowSaveForm] = useState(false);
   const [selectedQRCode, setSelectedQRCode] = useState<SavedQRCode | null>(null);
+  const [notification, setNotification] = useState<{
+    show: boolean;
+    type: 'success' | 'error' | 'info' | 'warning';
+    title: string;
+    message?: string;
+  }>({
+    show: false,
+    type: 'success',
+    title: '',
+    message: ''
+  });
 
   const currentType = QR_TYPES.find(t => t.type === qrConfig.type);
   const isValid = !currentType?.validation || currentType.validation.test(qrConfig.data);
@@ -93,8 +105,13 @@ export function QRGenerator() {
     setShowSaveForm(false);
     setQrCodeName('');
     
-    // Show success message
-    alert(`QR Code "${savedQRCode.name}" saved successfully!`);
+    // Show floating notification instead of alert
+    setNotification({
+      show: true,
+      type: 'success',
+      title: 'QR Code Saved!',
+      message: `"${savedQRCode.name}" has been saved successfully`
+    });
   };
 
   const handleQuickGenerate = () => {
@@ -363,6 +380,15 @@ export function QRGenerator() {
           </div>
         </div>
       </div>
+
+      {/* Floating Notification */}
+      <FloatingNotification
+        show={notification.show}
+        onHide={() => setNotification(prev => ({ ...prev, show: false }))}
+        type={notification.type}
+        title={notification.title}
+        message={notification.message}
+      />
     </div>
   );
 }
