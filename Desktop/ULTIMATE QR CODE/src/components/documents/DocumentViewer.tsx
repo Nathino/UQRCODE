@@ -144,6 +144,14 @@ export function DocumentViewer({ documentUrl, documentName, onBack }: DocumentVi
               </h3>
               <div className="flex gap-2">
                 <Button
+                  onClick={handleViewDocument}
+                  size="sm"
+                  className="bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm px-2 sm:px-4"
+                >
+                  <File className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
+                  <span className="hidden sm:inline">Open Full View</span>
+                </Button>
+                <Button
                   onClick={handleDownload}
                   size="sm"
                   className="bg-green-600 hover:bg-green-700 text-white text-xs sm:text-sm px-2 sm:px-4"

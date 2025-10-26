@@ -1,4 +1,4 @@
-import { QRConfig, QRTemplate } from './types';
+import { QRConfig, QRTemplate, ErrorCorrectionLevel } from './types';
 import { QR_TEMPLATES, ERROR_CORRECTION_LEVELS } from './constants';
 import { Button } from '@/components/ui/button';
 import { ColorPicker } from './ColorPicker';
@@ -26,7 +26,14 @@ export function QRStyleOptions({
     onConfigChange({
       style: template.style,
       errorCorrection: template.errorCorrection,
-      gradient: template.gradient
+      gradient: template.gradient ? {
+        ...template.gradient,
+        enabled: false  // Keep gradient colors but disabled by default
+      } : {
+        enabled: false,
+        colors: ['#6366f1', '#8b5cf6'],
+        type: 'linear'
+      }
     });
     onColorChange.setFgColor(template.fgColor);
     onColorChange.setBgColor(template.bgColor);
@@ -96,7 +103,7 @@ export function QRStyleOptions({
                   ? 'bg-blue-600 text-white border-blue-400 shadow-lg hover:bg-blue-700'
                   : 'bg-gray-100 border-gray-300 text-gray-700 hover:bg-gray-200 hover:border-gray-400'
               }`}
-              onClick={() => onConfigChange({ errorCorrection: value })}
+              onClick={() => onConfigChange({ errorCorrection: value as ErrorCorrectionLevel })}
             >
               <span className="font-medium">{label}</span>
             </Button>
@@ -132,6 +139,47 @@ export function QRStyleOptions({
             onChange={handleLogoUpload}
           />
         </div>
+      </div>
+
+      <div>
+        <h3 className="text-gray-800 text-lg font-semibold mb-4">Gradient Background</h3>
+        <div className="grid grid-cols-2 gap-3">
+          <Button
+            variant="outline"
+            className={`p-4 rounded-xl transition-all duration-300 ${
+              config.gradient.enabled
+                ? 'bg-blue-600 text-white border-blue-400 shadow-lg hover:bg-blue-700'
+                : 'bg-gray-100 border-gray-300 text-gray-700 hover:bg-gray-200 hover:border-gray-400'
+            }`}
+            onClick={() =>
+              onConfigChange({
+                gradient: {
+                  enabled: !config.gradient.enabled,
+                  colors: config.gradient.colors,
+                  type: config.gradient.type
+                }
+              })
+            }
+          >
+            <span className="font-medium">
+              {config.gradient.enabled ? 'Disable' : 'Enable'} Gradient
+            </span>
+          </Button>
+        </div>
+        {config.gradient.enabled && config.gradient.colors.length > 0 && (
+          <div className="mt-2 p-3 bg-gray-50 rounded-xl">
+            <p className="text-sm text-gray-600 mb-2">Gradient Colors:</p>
+            <div className="flex gap-2">
+              {config.gradient.colors.map((color, index) => (
+                <div
+                  key={index}
+                  className="w-8 h-8 rounded-lg border-2 border-gray-300"
+                  style={{ backgroundColor: color }}
+                />
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       <div>

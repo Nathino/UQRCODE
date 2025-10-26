@@ -97,42 +97,54 @@ export function QRDisplay({ value, fgColor, bgColor, config, disabled, onSave, c
       if (tempCanvas) {
         const ctx = canvas.getContext('2d');
         if (ctx) {
-          // Fill background with white (like the container in the app)
+          // Fill entire canvas with white background
           ctx.fillStyle = '#ffffff';
           ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-          // Draw QR code with rounded corners to match the app
-          const qrSize = downloadSize + (borderWidth * 2);
-          const qrX = padding - borderWidth;
-          const qrY = padding - borderWidth;
+          // Calculate the QR code container position and size
+          const qrContainerSize = downloadSize + (borderWidth * 2);
+          const qrContainerX = padding - borderWidth;
+          const qrContainerY = padding - borderWidth;
           
-          // Create rounded rectangle path
+          // Draw white rounded border/background for QR code area
           ctx.beginPath();
-          ctx.roundRect(qrX, qrY, qrSize, qrSize, borderRadius);
+          ctx.roundRect(qrContainerX, qrContainerY, qrContainerSize, qrContainerSize, borderRadius);
           ctx.fillStyle = '#ffffff';
           ctx.fill();
           
-          // Apply any gradient or effects
+          // Draw a subtle border around the QR code area
+          ctx.strokeStyle = '#e5e7eb';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          
+          // Create clipping region inside the border for the QR code
+          ctx.save();
+          ctx.beginPath();
+          ctx.roundRect(qrContainerX + 1, qrContainerY + 1, qrContainerSize - 2, qrContainerSize - 2, borderRadius - 1);
+          ctx.clip();
+          
+          // Apply gradient or solid background if configured
           if (config?.gradient?.enabled) {
-            const gradient = ctx.createLinearGradient(padding, padding, downloadSize + padding, downloadSize + padding);
+            const gradient = ctx.createLinearGradient(
+              padding, padding, 
+              downloadSize + padding, 
+              downloadSize + padding
+            );
             config.gradient.colors.forEach((color, index) => {
               gradient.addColorStop(index / (config.gradient.colors.length - 1), color);
             });
             ctx.fillStyle = gradient;
-            
-            // Draw gradient on rounded background
-            ctx.beginPath();
-            ctx.roundRect(qrX, qrY, qrSize, qrSize, borderRadius);
-            ctx.fill();
-            ctx.globalCompositeOperation = 'multiply';
+            ctx.fillRect(qrContainerX + 1, qrContainerY + 1, qrContainerSize - 2, qrContainerSize - 2);
+          } else {
+            ctx.fillStyle = bgColor;
+            ctx.fillRect(qrContainerX + 1, qrContainerY + 1, qrContainerSize - 2, qrContainerSize - 2);
           }
-
-          // Draw the QR code with rounded corners (centered in the rounded container)
-          ctx.beginPath();
-          ctx.roundRect(qrX, qrY, qrSize, qrSize, borderRadius);
-          ctx.clip();
           
+          // Draw the QR code
           ctx.drawImage(tempCanvas, padding, padding, downloadSize, downloadSize);
+          
+          // Restore context (remove clip)
+          ctx.restore();
 
           // Create download link
           const url = canvas.toDataURL('image/png');
@@ -252,10 +264,10 @@ export function QRDisplay({ value, fgColor, bgColor, config, disabled, onSave, c
           
           <div className="bg-blue-100 rounded-xl p-4 border border-blue-200">
             <p className="text-blue-800 text-sm font-medium">
-              <span className="text-green-600">✓</span> Downloads in 2208x2208px resolution with white border
+              <span className="text-green-600">✓</span> Downloads in 2208x2208px resolution with rounded corners and white border
             </p>
             <p className="text-blue-600 text-xs mt-1">
-              Professional quality for print and digital use with proper spacing and borders
+              Professional quality for print and digital use with proper spacing, rounded edges, and borders
             </p>
           </div>
         </div>
