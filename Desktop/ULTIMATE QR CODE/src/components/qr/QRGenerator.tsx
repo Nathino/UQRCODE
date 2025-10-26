@@ -54,12 +54,17 @@ export function QRGenerator() {
 
   const handleDocumentSelect = (document: DocumentMetadata) => {
     setSelectedDocument(document);
+    // Create an app URL that will handle document viewing
+    const documentViewerUrl = `${window.location.origin}/document/${document.id}`;
     setQrConfig(prev => ({
       ...prev,
       type: 'document',
-      data: document.url
+      data: documentViewerUrl
     }));
     setShowDocumentDashboard(false);
+    
+    // Update the browser URL to reflect the document selection
+    window.history.pushState({}, '', `/document/${document.id}`);
   };
 
   const handleQRCodeSelect = (qrCode: SavedQRCode) => {

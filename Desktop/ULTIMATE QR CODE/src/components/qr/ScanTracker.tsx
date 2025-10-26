@@ -69,8 +69,12 @@ export function ScanTracker({ onBack, qrCodeId, userId }: ScanTrackerProps) {
         window.open(qrData, '_blank');
         break;
       case 'document':
-        // Open document in new tab
-        window.open(qrData, '_blank');
+        // If it's an app URL, navigate to it, otherwise open in new tab
+        if (qrData.startsWith(window.location.origin)) {
+          window.location.href = qrData;
+        } else {
+          window.open(qrData, '_blank');
+        }
         break;
       case 'email':
         window.location.href = `mailto:${qrData}`;

@@ -60,10 +60,11 @@ export function QRDisplay({ value, fgColor, bgColor, config, disabled, onSave, c
   }, [showAnalytics, qrCodeId, userId]);
 
   const handleDownload = () => {
-    // Create a temporary canvas for high-resolution download
+    // Create a temporary canvas for high-resolution download with padding
+    const padding = 80; // Padding around QR code (equivalent to p-4 lg:p-6)
     const canvas = document.createElement('canvas');
-    canvas.width = downloadSize;
-    canvas.height = downloadSize;
+    canvas.width = downloadSize + (padding * 2);
+    canvas.height = downloadSize + (padding * 2);
     
     const qrCode = (
       <QRCode
@@ -94,19 +95,23 @@ export function QRDisplay({ value, fgColor, bgColor, config, disabled, onSave, c
       if (tempCanvas) {
         const ctx = canvas.getContext('2d');
         if (ctx) {
+          // Fill background with white (like the container in the app)
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+
           // Apply any gradient or effects
           if (config?.gradient?.enabled) {
-            const gradient = ctx.createLinearGradient(0, 0, downloadSize, downloadSize);
+            const gradient = ctx.createLinearGradient(padding, padding, downloadSize + padding, downloadSize + padding);
             config.gradient.colors.forEach((color, index) => {
               gradient.addColorStop(index / (config.gradient.colors.length - 1), color);
             });
             ctx.fillStyle = gradient;
-            ctx.fillRect(0, 0, downloadSize, downloadSize);
+            ctx.fillRect(padding, padding, downloadSize, downloadSize);
             ctx.globalCompositeOperation = 'multiply';
           }
 
-          // Draw the QR code
-          ctx.drawImage(tempCanvas, 0, 0, downloadSize, downloadSize);
+          // Draw the QR code with padding (centered)
+          ctx.drawImage(tempCanvas, padding, padding, downloadSize, downloadSize);
 
           // Create download link
           const url = canvas.toDataURL('image/png');
@@ -226,10 +231,10 @@ export function QRDisplay({ value, fgColor, bgColor, config, disabled, onSave, c
           
           <div className="bg-blue-100 rounded-xl p-4 border border-blue-200">
             <p className="text-blue-800 text-sm font-medium">
-              <span className="text-green-600">✓</span> Downloads in 2048x2048px resolution
+              <span className="text-green-600">✓</span> Downloads in 2208x2208px resolution with padding
             </p>
             <p className="text-blue-600 text-xs mt-1">
-              Professional quality for print and digital use
+              Professional quality for print and digital use with proper spacing
             </p>
           </div>
         </div>

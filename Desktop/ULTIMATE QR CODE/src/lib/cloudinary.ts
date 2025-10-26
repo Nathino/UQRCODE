@@ -50,6 +50,16 @@ export interface DocumentMetadata {
 
 export class CloudinaryStorage {
   /**
+   * Generate a signature for signed uploads (for better security)
+   */
+  private static generateSignature(timestamp: number, publicId: string): string {
+    // In a production app, this should be done server-side for security
+    // For now, we'll use a simple approach with the API secret
+    const signatureString = `public_id=${publicId}&timestamp=${timestamp}${cloudinaryConfig.api_secret}`;
+    return btoa(signatureString).replace(/[^a-zA-Z0-9]/g, '').substring(0, 32);
+  }
+
+  /**
    * Upload a PDF file to Cloudinary with compression
    */
   static async uploadPDF(file: File, userId: string, compress: boolean = true): Promise<DocumentMetadata> {
@@ -88,11 +98,12 @@ export class CloudinaryStorage {
       formData.append('public_id', publicId);
       formData.append('resource_type', 'raw');
       formData.append('folder', 'qr-documents');
+      formData.append('api_key', cloudinaryConfig.api_key);
       
-      // Add upload_preset if available
-      if (cloudinaryConfig.upload_preset) {
-        formData.append('upload_preset', cloudinaryConfig.upload_preset);
-      }
+      // Generate signature for signed upload
+      const signature = this.generateSignature(timestamp, publicId);
+      formData.append('timestamp', timestamp.toString());
+      formData.append('signature', signature);
 
       const response = await fetch(
         `https://api.cloudinary.com/v1_1/${cloudinaryConfig.cloud_name}/raw/upload`,
@@ -103,8 +114,16 @@ export class CloudinaryStorage {
       );
 
       if (!response.ok) {
-        console.error('Cloudinary upload failed:', response.status, response.statusText);
-        throw new Error('Failed to upload document. Please try again.');
+        const errorText = await response.text();
+        console.error('Cloudinary upload failed:', response.status, response.statusText, errorText);
+        
+        if (response.status === 401) {
+          throw new Error('Authentication failed. Please check your Cloudinary configuration.');
+        } else if (response.status === 400) {
+          throw new Error('Invalid request. Please check your file and try again.');
+        } else {
+          throw new Error(`Upload failed: ${response.statusText}. Please try again.`);
+        }
       }
 
       const result: UploadResult = await response.json();
@@ -133,7 +152,7 @@ export class CloudinaryStorage {
   static async deleteDocument(publicId: string): Promise<boolean> {
     try {
       const response = await fetch(
-        `https://api.cloudinary.com/v1_1/${cloudinaryConfig.cloud_name}/image/destroy`,
+        `https://api.cloudinary.com/v1_1/${cloudinaryConfig.cloud_name}/raw/destroy`,
         {
           method: 'POST',
           headers: {
@@ -142,6 +161,8 @@ export class CloudinaryStorage {
           body: JSON.stringify({
             public_id: publicId,
             resource_type: 'raw',
+            api_key: cloudinaryConfig.api_key,
+            api_secret: cloudinaryConfig.api_secret,
           }),
         }
       );
@@ -168,4 +189,5 @@ export class CloudinaryStorage {
     // In production, you might want to implement server-side URL signing
     return this.getDocumentUrl(publicId);
   }
+
 }

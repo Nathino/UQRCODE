@@ -32,8 +32,14 @@ export function DocumentViewer({ documentUrl, documentName, onBack }: DocumentVi
         if (response.ok) {
           setIsValidDocument(true);
           console.log('Document is accessible and valid');
+        } else if (response.status === 401) {
+          setError('Document access denied. This may be due to Cloudinary authentication issues.');
+          setIsValidDocument(false);
+        } else if (response.status === 404) {
+          setError('Document not found. It may have been deleted or moved.');
+          setIsValidDocument(false);
         } else {
-          setError('Document not found or access denied');
+          setError(`Document access failed (${response.status}). Please try again later.`);
           setIsValidDocument(false);
         }
       } catch (err) {
