@@ -9,6 +9,7 @@ import { DocumentDashboard } from '../documents/DocumentDashboard';
 import { QRCodeDashboard } from './QRCodeDashboard';
 import { DocumentMetadata } from '@/lib/cloudinary';
 import { SavedQRCode, QRCodeStorage } from '@/lib/qrStorage';
+import { PublicDocumentRegistry } from '@/lib/publicDocumentRegistry';
 import { useAuth } from '@/hooks/useAuth';
 import { FloatingNotification } from '@/components/ui/FloatingNotification';
 import { QrCode, Smartphone, Wifi, Mail, MapPin, Calendar, CreditCard, FileText, Zap, FolderOpen, Save } from 'lucide-react';
@@ -66,12 +67,17 @@ export function QRGenerator() {
 
   const handleDocumentSelect = (document: DocumentMetadata) => {
     setSelectedDocument(document);
-    // Create an app URL that will handle document viewing
-    const documentViewerUrl = `${window.location.origin}/document/${document.id}`;
+    
+    // Register the document as public so it can be accessed by anyone scanning the QR code
+    PublicDocumentRegistry.registerPublicDocument(document);
+    
+    // Use the app's document URL with the Cloudinary URL as a parameter
+    // This ensures global access while routing through your app
+    const documentUrl = `${window.location.origin}/document/${document.id}?url=${encodeURIComponent(document.url)}`;
     setQrConfig(prev => ({
       ...prev,
       type: 'document',
-      data: documentViewerUrl
+      data: documentUrl
     }));
     setShowDocumentDashboard(false);
     
@@ -86,6 +92,34 @@ export function QRGenerator() {
     setQrCodeName(qrCode.name);
     setSelectedQRCode(qrCode);
     setShowQRCodeDashboard(false);
+    
+    // If this is a document QR code, ensure the document is registered as public
+    if (qrCode.config.type === 'document') {
+      // Try to find the document in localStorage and register it as public
+      const userId = user?.uid || '';
+      const savedDocuments = localStorage.getItem(`documents_${userId}`);
+      if (savedDocuments) {
+        const documents: DocumentMetadata[] = JSON.parse(savedDocuments);
+        // Check if the QR code data is a Cloudinary URL or app URL
+        const document = documents.find(doc => 
+          doc.url === qrCode.config.data || 
+          qrCode.config.data.includes(doc.id)
+        );
+        if (document) {
+          PublicDocumentRegistry.registerPublicDocument(document);
+          setSelectedDocument(document);
+          
+          // Update the QR code data to use app URL if it's currently a Cloudinary URL
+          if (qrCode.config.data.startsWith('http') && !qrCode.config.data.includes(window.location.origin)) {
+            const updatedConfig = {
+              ...qrCode.config,
+              data: `${window.location.origin}/document/${document.id}`
+            };
+            setQrConfig(updatedConfig);
+          }
+        }
+      }
+    }
   };
 
   const handleSaveQRCode = () => {
@@ -101,6 +135,11 @@ export function QRGenerator() {
       userId: user.uid,
       isActive: true
     });
+
+    // If this is a document QR code, ensure it's registered as public
+    if (qrConfig.type === 'document' && selectedDocument) {
+      PublicDocumentRegistry.registerPublicDocument(selectedDocument);
+    }
 
     setShowSaveForm(false);
     setQrCodeName('');
@@ -127,9 +166,9 @@ export function QRGenerator() {
 
   if (showDocumentDashboard) {
     return (
-      <div className="min-h-screen bg-blue-600 p-6">
+      <div className="min-h-screen bg-blue-600 p-3 sm:p-6">
         <div className="max-w-6xl mx-auto">
-          <div className="mb-6">
+          <div className="mb-4 sm:mb-6">
             <button
               onClick={() => setShowDocumentDashboard(false)}
               className="text-white/70 hover:text-white mb-4"

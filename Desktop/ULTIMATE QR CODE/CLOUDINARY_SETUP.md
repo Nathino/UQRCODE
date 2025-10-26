@@ -13,16 +13,32 @@
    - API Key
    - API Secret
 
-## 2.1. Create an Upload Preset
+## 2.1. ENABLE PDF DELIVERY (CRITICAL - DO THIS FIRST!)
+⚠️ **THIS IS THE MOST LIKELY CAUSE OF YOUR 401 ERRORS!**
+
+Cloudinary blocks PDF/ZIP delivery by default for security reasons.
+
+1. In your Cloudinary dashboard, go to **Settings → Security**
+2. Find the setting: **"Allow delivery of PDF and ZIP files"**
+3. **Check the box** to enable it
+4. Click **Save**
+
+Without this enabled, ALL PDF files will return 401 errors even if they're uploaded successfully.
+
+## 2.2. Create an Upload Preset (REQUIRED)
+⚠️ **IMPORTANT**: You MUST create an UNSIGNED upload preset to allow public access to PDF documents via QR codes.
+
 1. In your Cloudinary dashboard, go to "Settings" → "Upload"
 2. Scroll down to "Upload presets" section
 3. Click "Add upload preset"
-4. Configure the preset:
+4. **CRITICAL Configuration**:
    - **Preset name**: `qr-documents-upload` (or any name you prefer)
-   - **Signing Mode**: Select "Unsigned" (for client-side uploads)
+   - **Signing Mode**: **MUST select "Unsigned"** ⚠️ (This allows public access without authentication)
    - **Folder**: `qr-documents` (optional, already handled in code)
    - **Resource Type**: `Raw` (for PDF files)
+   - **Access Mode**: Select "Public" (allows anyone to access the files)
 5. Click "Save" and copy the preset name
+6. Add the preset name to your `.env` file (see step 3 below)
 
 ## 3. Configure Environment Variables
 Create a `.env` file in your project root with:
@@ -43,12 +59,15 @@ VITE_FIREBASE_MEASUREMENT_ID=your_measurement_id_here
 VITE_CLOUDINARY_CLOUD_NAME=your_cloudinary_cloud_name_here
 VITE_CLOUDINARY_API_KEY=your_cloudinary_api_key_here
 VITE_CLOUDINARY_API_SECRET=your_cloudinary_api_secret_here
-# Cloudinary Upload Preset (OPTIONAL but RECOMMENDED)
-# Create an upload preset in Cloudinary Dashboard > Settings > Upload
-VITE_CLOUDINARY_UPLOAD_PRESET=your_upload_preset_name_here
+# Cloudinary Upload Preset (REQUIRED - MUST be unsigned for public access)
+# Create an UNSIGNED upload preset in Cloudinary Dashboard > Settings > Upload
+VITE_CLOUDINARY_UPLOAD_PRESET=qr-documents-upload
 ```
 
-**⚠️ IMPORTANT**: The core Cloudinary environment variables (cloud_name, api_key, api_secret) are **REQUIRED**. The upload_preset is **OPTIONAL** but **RECOMMENDED** for better security.
+**⚠️ IMPORTANT**: 
+- All Cloudinary environment variables (cloud_name, api_key, api_secret, upload_preset) are **REQUIRED**
+- The `upload_preset` **MUST** be configured as **UNSIGNED** to allow public access to PDF documents
+- Without an unsigned upload preset, PDFs will return 401 errors when accessed via QR codes
 
 ## 4. Features Included
 - PDF document upload with **automatic compression**

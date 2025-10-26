@@ -9,8 +9,8 @@ const cloudinaryConfig = {
   upload_preset: import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET,
 };
 
-// Check for missing required Cloudinary environment variables (upload_preset is optional)
-const requiredVars = ['cloud_name', 'api_key', 'api_secret'];
+// Check for missing required Cloudinary environment variables
+const requiredVars = ['cloud_name', 'api_key', 'api_secret', 'upload_preset'];
 const missingRequiredVars = requiredVars
   .filter(key => !cloudinaryConfig[key as keyof typeof cloudinaryConfig])
   .map(key => `VITE_CLOUDINARY_${key.toUpperCase()}`);
@@ -22,9 +22,10 @@ if (missingRequiredVars.length > 0) {
   );
 }
 
-// Note: upload_preset is optional but recommended for better security
-// If you want to set it up, create an upload preset in Cloudinary Dashboard > Settings > Upload
+// Note: upload_preset is REQUIRED and MUST be configured as UNSIGNED for public document access
+// Create an unsigned upload preset in Cloudinary Dashboard > Settings > Upload
 // and add VITE_CLOUDINARY_UPLOAD_PRESET=your_preset_name to your .env file
+// Without an unsigned preset, documents will return 401 errors when accessed via QR codes
 
 export interface UploadResult {
   public_id: string;
@@ -52,11 +53,36 @@ export class CloudinaryStorage {
   /**
    * Generate a signature for signed uploads (for better security)
    */
-  private static generateSignature(timestamp: number, publicId: string): string {
-    // In a production app, this should be done server-side for security
-    // For now, we'll use a simple approach with the API secret
-    const signatureString = `public_id=${publicId}&timestamp=${timestamp}${cloudinaryConfig.api_secret}`;
-    return btoa(signatureString).replace(/[^a-zA-Z0-9]/g, '').substring(0, 32);
+  private static async generateUploadSignature(timestamp: number, publicId: string, folder: string): Promise<string> {
+    // For upload operations, Cloudinary expects: folder=value&public_id=value&timestamp=value
+    const stringToSign = `folder=${folder}&public_id=${publicId}&timestamp=${timestamp}${cloudinaryConfig.api_secret}`;
+    
+    // Create SHA-1 hash
+    const encoder = new TextEncoder();
+    const data = encoder.encode(stringToSign);
+    const hashBuffer = await crypto.subtle.digest('SHA-1', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    
+    return hashHex;
+  }
+
+  /**
+   * Generate a proper SHA-1 signature for Cloudinary API requests
+   */
+  private static async generateSHA1Signature(params: Record<string, any>): Promise<string> {
+    // For destroy operations, Cloudinary expects specific parameter order
+    // Based on the error message, it expects: public_id=value&timestamp=value
+    const stringToSign = `public_id=${params.public_id}&timestamp=${params.timestamp}${cloudinaryConfig.api_secret}`;
+    
+    // Create SHA-1 hash
+    const encoder = new TextEncoder();
+    const data = encoder.encode(stringToSign);
+    const hashBuffer = await crypto.subtle.digest('SHA-1', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    
+    return hashHex;
   }
 
   /**
@@ -65,7 +91,8 @@ export class CloudinaryStorage {
   static async uploadPDF(file: File, userId: string, compress: boolean = true): Promise<DocumentMetadata> {
     const uniqueId = uuidv4();
     const timestamp = Date.now();
-    const publicId = `documents/${userId}/${timestamp}_${uniqueId}`;
+    // Include folder in public_id for proper path structure with unsigned preset
+    const publicId = `qr-documents/documents/${userId}/${timestamp}_${uniqueId}`;
     const originalSize = file.size;
 
     try {
@@ -97,13 +124,21 @@ export class CloudinaryStorage {
       formData.append('file', fileToUpload);
       formData.append('public_id', publicId);
       formData.append('resource_type', 'raw');
-      formData.append('folder', 'qr-documents');
-      formData.append('api_key', cloudinaryConfig.api_key);
       
-      // Generate signature for signed upload
-      const signature = this.generateSignature(timestamp, publicId);
-      formData.append('timestamp', timestamp.toString());
-      formData.append('signature', signature);
+      // Use upload preset if available (unsigned uploads for public access)
+      if (cloudinaryConfig.upload_preset) {
+        console.log('📤 Uploading with UNSIGNED preset:', cloudinaryConfig.upload_preset);
+        formData.append('upload_preset', cloudinaryConfig.upload_preset);
+        // Note: access_mode cannot be set here - it must be configured in the upload preset
+        // If getting 401 errors, configure the preset to allow public access in Cloudinary dashboard
+      } else {
+        console.warn('⚠️ No upload preset found. Using signed upload (requires auth). This may cause 401 errors!');
+        // Fallback to signed upload if no preset is configured
+        formData.append('api_key', cloudinaryConfig.api_key);
+        const signature = await this.generateUploadSignature(timestamp, publicId, 'qr-documents');
+        formData.append('timestamp', timestamp.toString());
+        formData.append('signature', signature);
+      }
 
       const response = await fetch(
         `https://api.cloudinary.com/v1_1/${cloudinaryConfig.cloud_name}/raw/upload`,
@@ -151,6 +186,18 @@ export class CloudinaryStorage {
    */
   static async deleteDocument(publicId: string): Promise<boolean> {
     try {
+      const timestamp = Math.round(Date.now() / 1000);
+      
+      // Prepare parameters for signature generation
+      const params = {
+        public_id: publicId,
+        resource_type: 'raw',
+        timestamp: timestamp
+      };
+      
+      // Generate proper SHA-1 signature
+      const signature = await this.generateSHA1Signature(params);
+      
       const response = await fetch(
         `https://api.cloudinary.com/v1_1/${cloudinaryConfig.cloud_name}/raw/destroy`,
         {
@@ -161,13 +208,21 @@ export class CloudinaryStorage {
           body: JSON.stringify({
             public_id: publicId,
             resource_type: 'raw',
+            timestamp: timestamp,
             api_key: cloudinaryConfig.api_key,
-            api_secret: cloudinaryConfig.api_secret,
+            signature: signature
           }),
         }
       );
 
-      return response.ok;
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Cloudinary delete failed:', response.status, response.statusText, errorText);
+        return false;
+      }
+
+      const result = await response.json();
+      return result.result === 'ok';
     } catch (error) {
       console.error('Error deleting from Cloudinary:', error);
       return false;

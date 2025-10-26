@@ -115,7 +115,7 @@ export function PDFUpload({ onUploadSuccess, userId, maxSizeInMB = 10 }: PDFUplo
   return (
     <div className="w-full">
       <div
-        className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+        className={`border-2 border-dashed rounded-lg p-4 sm:p-8 text-center transition-colors ${
           isUploading
             ? 'border-blue-400 bg-blue-50/10'
             : 'border-white/20 hover:border-white/40'
@@ -123,9 +123,9 @@ export function PDFUpload({ onUploadSuccess, userId, maxSizeInMB = 10 }: PDFUplo
         onDrop={handleDrop}
         onDragOver={handleDragOver}
       >
-        <div className="flex flex-col items-center space-y-4">
-          <div className="p-4 bg-white/10 rounded-full">
-            <Upload className="w-8 h-8 text-white" />
+        <div className="flex flex-col items-center space-y-3 sm:space-y-4">
+          <div className="p-3 sm:p-4 bg-white/10 rounded-full">
+            <Upload className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
           </div>
           
           <div>

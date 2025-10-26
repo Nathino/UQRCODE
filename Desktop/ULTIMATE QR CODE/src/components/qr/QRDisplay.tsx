@@ -62,6 +62,8 @@ export function QRDisplay({ value, fgColor, bgColor, config, disabled, onSave, c
   const handleDownload = () => {
     // Create a temporary canvas for high-resolution download with padding
     const padding = 80; // Padding around QR code (equivalent to p-4 lg:p-6)
+    const borderWidth = 8; // Increased border width for better appearance
+    const borderRadius = 24; // Rounded corners to match the app's rounded-2xl (24px)
     const canvas = document.createElement('canvas');
     canvas.width = downloadSize + (padding * 2);
     canvas.height = downloadSize + (padding * 2);
@@ -99,6 +101,17 @@ export function QRDisplay({ value, fgColor, bgColor, config, disabled, onSave, c
           ctx.fillStyle = '#ffffff';
           ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+          // Draw QR code with rounded corners to match the app
+          const qrSize = downloadSize + (borderWidth * 2);
+          const qrX = padding - borderWidth;
+          const qrY = padding - borderWidth;
+          
+          // Create rounded rectangle path
+          ctx.beginPath();
+          ctx.roundRect(qrX, qrY, qrSize, qrSize, borderRadius);
+          ctx.fillStyle = '#ffffff';
+          ctx.fill();
+          
           // Apply any gradient or effects
           if (config?.gradient?.enabled) {
             const gradient = ctx.createLinearGradient(padding, padding, downloadSize + padding, downloadSize + padding);
@@ -106,11 +119,19 @@ export function QRDisplay({ value, fgColor, bgColor, config, disabled, onSave, c
               gradient.addColorStop(index / (config.gradient.colors.length - 1), color);
             });
             ctx.fillStyle = gradient;
-            ctx.fillRect(padding, padding, downloadSize, downloadSize);
+            
+            // Draw gradient on rounded background
+            ctx.beginPath();
+            ctx.roundRect(qrX, qrY, qrSize, qrSize, borderRadius);
+            ctx.fill();
             ctx.globalCompositeOperation = 'multiply';
           }
 
-          // Draw the QR code with padding (centered)
+          // Draw the QR code with rounded corners (centered in the rounded container)
+          ctx.beginPath();
+          ctx.roundRect(qrX, qrY, qrSize, qrSize, borderRadius);
+          ctx.clip();
+          
           ctx.drawImage(tempCanvas, padding, padding, downloadSize, downloadSize);
 
           // Create download link
@@ -201,7 +222,7 @@ export function QRDisplay({ value, fgColor, bgColor, config, disabled, onSave, c
           <div className="flex flex-col sm:flex-row gap-4">
             <Button
               onClick={handleDownload}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-6 sm:px-10 py-4 sm:py-5 rounded-xl transition-all duration-300 font-semibold shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex-1 text-base sm:text-lg"
+              className="bg-blue-600 hover:bg-blue-700 text-white px-6 sm:px-10 py-4 sm:py-5 rounded-xl transition-all duration-300 font-semibold shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex-1 text-sm sm:text-base"
               disabled={disabled}
             >
               <Download className="w-5 h-5 sm:w-6 sm:h-6 mr-3 sm:mr-4" />
@@ -211,17 +232,17 @@ export function QRDisplay({ value, fgColor, bgColor, config, disabled, onSave, c
             {onSave && canSave && (
               <Button
                 onClick={onSave}
-                className="bg-green-600 hover:bg-green-700 text-white px-6 sm:px-10 py-4 sm:py-5 rounded-xl transition-all duration-300 font-semibold shadow-lg hover:shadow-xl flex-1 text-base sm:text-lg"
+                className="bg-green-600 hover:bg-green-700 text-white px-6 sm:px-10 py-4 sm:py-5 rounded-xl transition-all duration-300 font-semibold shadow-lg hover:shadow-xl flex-1 text-sm sm:text-base"
               >
                 <Save className="w-5 h-5 sm:w-6 sm:h-6 mr-3 sm:mr-4" />
-                <span className="leading-tight">Save QR Code</span>
+                <span className="leading-tight">Save</span>
               </Button>
             )}
 
             {showAnalytics && (
               <Button
                 onClick={() => setShowScanAnalytics(!showScanAnalytics)}
-                className="bg-purple-600 hover:bg-purple-700 text-white px-6 sm:px-10 py-4 sm:py-5 rounded-xl transition-all duration-300 font-semibold shadow-lg hover:shadow-xl flex-1 text-base sm:text-lg"
+                className="bg-purple-600 hover:bg-purple-700 text-white px-6 sm:px-10 py-4 sm:py-5 rounded-xl transition-all duration-300 font-semibold shadow-lg hover:shadow-xl flex-1 text-sm sm:text-base"
               >
                 <BarChart3 className="w-5 h-5 sm:w-6 sm:h-6 mr-3 sm:mr-4" />
                 <span className="leading-tight">Analytics</span>
@@ -231,10 +252,10 @@ export function QRDisplay({ value, fgColor, bgColor, config, disabled, onSave, c
           
           <div className="bg-blue-100 rounded-xl p-4 border border-blue-200">
             <p className="text-blue-800 text-sm font-medium">
-              <span className="text-green-600">✓</span> Downloads in 2208x2208px resolution with padding
+              <span className="text-green-600">✓</span> Downloads in 2208x2208px resolution with white border
             </p>
             <p className="text-blue-600 text-xs mt-1">
-              Professional quality for print and digital use with proper spacing
+              Professional quality for print and digital use with proper spacing and borders
             </p>
           </div>
         </div>

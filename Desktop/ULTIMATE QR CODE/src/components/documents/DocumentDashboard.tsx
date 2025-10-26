@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { PDFUpload } from './PDFUpload';
 import { DocumentMetadata } from '@/lib/cloudinary';
+import { PublicDocumentRegistry } from '@/lib/publicDocumentRegistry';
 import { File, Download, Trash2, QrCode, Eye } from 'lucide-react';
 import { CloudinaryStorage } from '@/lib/cloudinary';
 
@@ -37,6 +38,9 @@ export function DocumentDashboard({ userId, onDocumentSelect }: DocumentDashboar
     try {
       const success = await CloudinaryStorage.deleteDocument(document.publicId);
       if (success) {
+        // Remove from public registry if it exists
+        PublicDocumentRegistry.removePublicDocument(documentId);
+        
         const updatedDocuments = documents.filter(doc => doc.id !== documentId);
         setDocuments(updatedDocuments);
         localStorage.setItem(`documents_${userId}`, JSON.stringify(updatedDocuments));
@@ -76,14 +80,14 @@ export function DocumentDashboard({ userId, onDocumentSelect }: DocumentDashboar
   };
 
   return (
-    <div className="space-y-6">
-      <div className="bg-white/5 rounded-xl p-6">
+    <div className="space-y-4 sm:space-y-6">
+      <div className="bg-white/5 rounded-xl p-3 sm:p-6">
         <h2 className="text-xl font-semibold text-white mb-4">Upload New Document</h2>
         <PDFUpload onUploadSuccess={handleUploadSuccess} userId={userId} />
       </div>
 
       {documents.length > 0 && (
-        <div className="bg-white/5 rounded-xl p-6">
+        <div className="bg-white/5 rounded-xl p-3 sm:p-6">
           <h2 className="text-xl font-semibold text-white mb-4">Your Documents</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {documents.map((document) => (
@@ -96,9 +100,9 @@ export function DocumentDashboard({ userId, onDocumentSelect }: DocumentDashboar
                 }`}
               >
                 <div className="flex items-start justify-between mb-3">
-                  <div className="flex items-center space-x-2">
-                    <File className="w-5 h-5 text-white" />
-                    <span className="text-white font-medium truncate">
+                  <div className="flex items-center space-x-2 flex-1 min-w-0 overflow-hidden">
+                    <File className="w-5 h-5 text-white flex-shrink-0" />
+                    <span className="text-white font-medium truncate block">
                       {document.originalName}
                     </span>
                   </div>
@@ -133,6 +137,22 @@ export function DocumentDashboard({ userId, onDocumentSelect }: DocumentDashboar
                     className="bg-green-600 hover:bg-green-700 text-white"
                   >
                     <Eye className="w-4 h-4" />
+                  </Button>
+                  
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      const link = window.document.createElement('a');
+                      link.href = document.url;
+                      link.download = document.originalName;
+                      link.target = '_blank';
+                      window.document.body.appendChild(link);
+                      link.click();
+                      window.document.body.removeChild(link);
+                    }}
+                    className="bg-purple-600 hover:bg-purple-700 text-white"
+                  >
+                    <Download className="w-4 h-4" />
                   </Button>
                   
                   <Button

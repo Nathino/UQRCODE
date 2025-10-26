@@ -40,6 +40,7 @@ export default function App() {
           }
         } else {
           // Unauthenticated user (QR code scanner) - use public document viewer
+          // Note: Scan tracking happens in PublicDocumentViewer for unauthenticated users
           setPublicDocumentId(documentId);
           setCurrentView('public-document');
         }
