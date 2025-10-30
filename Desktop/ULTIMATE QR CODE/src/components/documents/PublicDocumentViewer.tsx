@@ -16,6 +16,14 @@ export function PublicDocumentViewer({ documentId }: PublicDocumentViewerProps) 
     name: string;
     isValid: boolean;
   } | null>(null);
+  
+  const shouldDirectOpenOnMobile = () => {
+    const ua = navigator.userAgent || navigator.vendor;
+    const isIOS = /iPad|iPhone|iPod/.test(ua);
+    const isAndroid = /Android/.test(ua);
+    const isMobile = isIOS || isAndroid;
+    return isMobile;
+  };
 
   useEffect(() => {
     const loadDocument = async () => {
@@ -48,11 +56,17 @@ export function PublicDocumentViewer({ documentId }: PublicDocumentViewerProps) 
           try {
             const response = await fetch(urlToUse, { method: 'HEAD' });
             if (response.ok) {
-              setDocumentData({
+              const doc = {
                 url: urlToUse,
                 name: publicDocument.documentMetadata.originalName,
                 isValid: true
-              });
+              } as const;
+              setDocumentData(doc);
+              // On mobile, open directly in the native PDF viewer to avoid forced download prompts
+              if (shouldDirectOpenOnMobile()) {
+                window.location.replace(doc.url);
+                return;
+              }
               setIsLoading(false);
               return;
             }
@@ -71,11 +85,16 @@ export function PublicDocumentViewer({ documentId }: PublicDocumentViewerProps) 
             if (response.ok) {
               // Extract filename from URL if possible
               const filename = directUrl.split('/').pop() || 'document.pdf';
-              setDocumentData({
+              const doc = {
                 url: directUrl,
                 name: filename,
                 isValid: true
-              });
+              } as const;
+              setDocumentData(doc);
+              if (shouldDirectOpenOnMobile()) {
+                window.location.replace(doc.url);
+                return;
+              }
               setIsLoading(false);
               return;
             }
@@ -144,14 +163,14 @@ export function PublicDocumentViewer({ documentId }: PublicDocumentViewerProps) 
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-600 via-blue-700 to-blue-800">
+    <div className="min-h-screen overflow-x-hidden bg-gradient-to-br from-blue-600 via-blue-700 to-blue-800">
       <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-8">
         <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-3 sm:p-8 shadow-xl">
-          <div className="flex items-center justify-between mb-4 sm:mb-6">
-            <div className="flex items-center space-x-2 sm:space-x-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-3 mb-4 sm:mb-6">
+            <div className="flex min-w-0 items-center space-x-2 sm:space-x-3">
               <File className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
               <div>
-                <h1 className="text-lg sm:text-2xl font-bold text-white">
+                <h1 className="text-lg sm:text-2xl font-bold text-white truncate">
                   {documentData?.name || 'Document Viewer'}
                 </h1>
                 <p className="text-white/70 text-sm sm:text-base">PDF Document</p>
@@ -160,10 +179,10 @@ export function PublicDocumentViewer({ documentId }: PublicDocumentViewerProps) 
             <Button
               onClick={() => window.location.href = '/'}
               variant="outline"
-              className="bg-white/10 border-white/20 text-white hover:bg-white/20"
+              className="bg-white/10 border-white/20 text-white hover:bg-white/20 shrink-0"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
-              Home
+              <span className="hidden sm:inline">Home</span>
             </Button>
           </div>
 

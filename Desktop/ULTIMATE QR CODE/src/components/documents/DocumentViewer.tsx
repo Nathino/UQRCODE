@@ -111,14 +111,14 @@ export function DocumentViewer({ documentUrl, documentName, onBack }: DocumentVi
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-600 via-blue-700 to-blue-800">
+    <div className="min-h-screen overflow-x-hidden bg-gradient-to-br from-blue-600 via-blue-700 to-blue-800">
       <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-8">
         <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-3 sm:p-8 shadow-xl">
-          <div className="flex items-center justify-between mb-4 sm:mb-6">
-            <div className="flex items-center space-x-2 sm:space-x-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-3 mb-4 sm:mb-6">
+            <div className="flex min-w-0 items-center space-x-2 sm:space-x-3">
               <File className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
               <div>
-                <h1 className="text-lg sm:text-2xl font-bold text-white">
+                <h1 className="text-lg sm:text-2xl font-bold text-white truncate">
                   {documentName || 'Document Viewer'}
                 </h1>
                 <p className="text-white/70 text-sm sm:text-base">PDF Document</p>
@@ -128,10 +128,10 @@ export function DocumentViewer({ documentUrl, documentName, onBack }: DocumentVi
               <Button
                 onClick={onBack}
                 variant="outline"
-                className="bg-white/10 border-white/20 text-white hover:bg-white/20"
+                className="bg-white/10 border-white/20 text-white hover:bg-white/20 shrink-0"
               >
                 <ArrowLeft className="w-4 h-4 mr-2" />
-                Back
+                <span className="hidden sm:inline">Back</span>
               </Button>
             )}
           </div>

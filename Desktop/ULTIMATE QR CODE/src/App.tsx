@@ -5,9 +5,7 @@ import { LoginForm } from './components/auth/LoginForm';
 import { QRGenerator } from './components/qr/QRGenerator';
 import { DocumentViewer } from './components/documents/DocumentViewer';
 import { PublicDocumentViewer } from './components/documents/PublicDocumentViewer';
-import { LoadingSpinner } from './components/ui/loading';
 import { AuthLayout } from './components/layout/AuthLayout';
-import { SplashScreen } from './components/ui/SplashScreen';
 import { useState, useEffect } from 'react';
 import { DocumentMetadata } from './lib/cloudinary';
 
@@ -54,10 +52,6 @@ export default function App() {
     window.history.pushState({}, '', '/');
   };
 
-  if (loading) {
-    return <LoadingSpinner />;
-  }
-
   // Handle public document access (no authentication required)
   if (currentView === 'public-document' && publicDocumentId) {
     return <PublicDocumentViewer documentId={publicDocumentId} />;
@@ -76,12 +70,14 @@ export default function App() {
 
   // Show login form for unauthenticated users
   if (!user) {
-    return (
-      <>
-        <SplashScreen />
-        <LoginForm />
-      </>
-    );
+    return <LoginForm />;
+  }
+
+  // Show loading spinner for authenticated users who are still loading
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center bg-blue-600">
+      <div className="text-white text-xl">Loading...</div>
+    </div>;
   }
 
   // Show main app for authenticated users
