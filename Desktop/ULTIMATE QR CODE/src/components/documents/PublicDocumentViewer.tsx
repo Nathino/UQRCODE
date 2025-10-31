@@ -3,6 +3,8 @@ import { Button } from '@/components/ui/button';
 import { Download, ArrowLeft, File, AlertCircle, Loader } from 'lucide-react';
 import { PublicDocumentRegistry } from '@/lib/publicDocumentRegistry';
 import { QRCodeStorage } from '@/lib/qrStorage';
+import { QRCodeFirestore } from '@/lib/qrCodeFirestore';
+import { ScanTracker } from '@/lib/scanTracker';
 
 interface PublicDocumentViewerProps {
   documentId: string;
@@ -39,10 +41,23 @@ export function PublicDocumentViewer({ documentId }: PublicDocumentViewerProps) 
           // Update access time for analytics
           PublicDocumentRegistry.updateAccessTime(documentId);
           
-          // Track scan count - increment every time document is accessed via QR code
+          // Track scan count - find the QR code that points to this document
           const userId = publicDocument.documentMetadata.userId;
           if (userId) {
-            QRCodeStorage.incrementScanCount(userId, documentId);
+            try {
+              // Find the QR code that points to this document
+              const qrCode = await QRCodeFirestore.findQRCodeByDocumentId(documentId, userId);
+              if (qrCode) {
+                // Track scan with proper QR code ID
+                await QRCodeStorage.incrementScanCount(userId, qrCode.id);
+                // Also store detailed scan event in Firestore
+                await ScanTracker.trackScan(qrCode.id, userId, {
+                  documentId: documentId
+                });
+              }
+            } catch (error) {
+              console.error('Error tracking document scan:', error);
+            }
           }
           
           // Check if there's a direct URL parameter (from QR code)

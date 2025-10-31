@@ -8,6 +8,7 @@ import { PublicDocumentViewer } from './components/documents/PublicDocumentViewe
 import { AuthLayout } from './components/layout/AuthLayout';
 import { useState, useEffect } from 'react';
 import { DocumentMetadata } from './lib/cloudinary';
+import { DocumentStorage } from './lib/documentStorage';
 
 export default function App() {
   const { user, loading } = useAuth();
@@ -21,29 +22,34 @@ export default function App() {
 
   // Check URL for document viewing
   useEffect(() => {
-    const path = window.location.pathname;
-    if (path.startsWith('/document/')) {
-      const documentId = path.split('/document/')[1];
-      if (documentId) {
-        if (user) {
-          // Authenticated user - use private document viewer
-          const savedDocuments = localStorage.getItem(`documents_${user.uid}`);
-          if (savedDocuments) {
-            const documents: DocumentMetadata[] = JSON.parse(savedDocuments);
-            const document = documents.find(doc => doc.id === documentId);
-            if (document) {
-              setSelectedDocument(document);
-              setCurrentView('document');
+    const loadDocument = async () => {
+      const path = window.location.pathname;
+      if (path.startsWith('/document/')) {
+        const documentId = path.split('/document/')[1];
+        if (documentId) {
+          if (user) {
+            // Authenticated user - use private document viewer
+            try {
+              const documents = await DocumentStorage.getUserDocuments(user.uid);
+              const document = documents.find(doc => doc.id === documentId);
+              if (document) {
+                setSelectedDocument(document);
+                setCurrentView('document');
+              }
+            } catch (error) {
+              console.error('Error loading document:', error);
             }
+          } else {
+            // Unauthenticated user (QR code scanner) - use public document viewer
+            // Note: Scan tracking happens in PublicDocumentViewer for unauthenticated users
+            setPublicDocumentId(documentId);
+            setCurrentView('public-document');
           }
-        } else {
-          // Unauthenticated user (QR code scanner) - use public document viewer
-          // Note: Scan tracking happens in PublicDocumentViewer for unauthenticated users
-          setPublicDocumentId(documentId);
-          setCurrentView('public-document');
         }
       }
-    }
+    };
+    
+    loadDocument();
   }, [user]);
 
   const handleBackToGenerator = () => {

@@ -8,6 +8,7 @@ import { QR_TYPES } from './constants';
 import { DocumentDashboard } from '../documents/DocumentDashboard';
 import { QRCodeDashboard } from './QRCodeDashboard';
 import { DocumentMetadata } from '@/lib/cloudinary';
+import { DocumentStorage } from '@/lib/documentStorage';
 import { SavedQRCode, QRCodeStorage } from '@/lib/qrStorage';
 import { PublicDocumentRegistry } from '@/lib/publicDocumentRegistry';
 import { useAuth } from '@/hooks/useAuth';
@@ -85,7 +86,7 @@ export function QRGenerator() {
     window.history.pushState({}, '', `/document/${document.id}`);
   };
 
-  const handleQRCodeSelect = (qrCode: SavedQRCode) => {
+  const handleQRCodeSelect = async (qrCode: SavedQRCode) => {
     setQrConfig(qrCode.config);
     setFgColor(qrCode.fgColor);
     setBgColor(qrCode.bgColor);
@@ -95,62 +96,75 @@ export function QRGenerator() {
     
     // If this is a document QR code, ensure the document is registered as public
     if (qrCode.config.type === 'document') {
-      // Try to find the document in localStorage and register it as public
+      // Try to find the document in Firestore and register it as public
       const userId = user?.uid || '';
-      const savedDocuments = localStorage.getItem(`documents_${userId}`);
-      if (savedDocuments) {
-        const documents: DocumentMetadata[] = JSON.parse(savedDocuments);
-        // Check if the QR code data is a Cloudinary URL or app URL
-        const document = documents.find(doc => 
-          doc.url === qrCode.config.data || 
-          qrCode.config.data.includes(doc.id)
-        );
-        if (document) {
-          PublicDocumentRegistry.registerPublicDocument(document);
-          setSelectedDocument(document);
-          
-          // Update the QR code data to use app URL if it's currently a Cloudinary URL
-          if (qrCode.config.data.startsWith('http') && !qrCode.config.data.includes(window.location.origin)) {
-            const updatedConfig = {
-              ...qrCode.config,
-              data: `${window.location.origin}/document/${document.id}`
-            };
-            setQrConfig(updatedConfig);
+      try {
+        const documents = await DocumentStorage.getUserDocuments(userId);
+        // Extract document ID from QR code data URL
+        const urlMatch = qrCode.config.data.match(/\/document\/([^/?]+)/);
+        const documentId = urlMatch ? urlMatch[1] : null;
+        
+        if (documentId) {
+          const document = documents.find(doc => doc.id === documentId);
+          if (document) {
+            PublicDocumentRegistry.registerPublicDocument(document);
+            setSelectedDocument(document);
+            
+            // Update the QR code data to use app URL if it's currently a Cloudinary URL
+            if (qrCode.config.data.startsWith('http') && !qrCode.config.data.includes(window.location.origin)) {
+              const updatedConfig = {
+                ...qrCode.config,
+                data: `${window.location.origin}/document/${document.id}`
+              };
+              setQrConfig(updatedConfig);
+            }
           }
         }
+      } catch (error) {
+        console.error('Error loading document for QR code:', error);
       }
     }
   };
 
-  const handleSaveQRCode = () => {
+  const handleSaveQRCode = async () => {
     if (!qrCodeName.trim() || !qrConfig.data || !isValid || !user) return;
 
-    const savedQRCode = QRCodeStorage.saveQRCode({
-      name: qrCodeName.trim(),
-      type: qrConfig.type as QRType,
-      data: qrConfig.data,
-      config: qrConfig,
-      fgColor,
-      bgColor,
-      userId: user.uid,
-      isActive: true
-    });
+    try {
+      const savedQRCode = await QRCodeStorage.saveQRCode({
+        name: qrCodeName.trim(),
+        type: qrConfig.type as QRType,
+        data: qrConfig.data,
+        config: qrConfig,
+        fgColor,
+        bgColor,
+        userId: user.uid,
+        isActive: true
+      });
 
-    // If this is a document QR code, ensure it's registered as public
-    if (qrConfig.type === 'document' && selectedDocument) {
-      PublicDocumentRegistry.registerPublicDocument(selectedDocument);
+      // If this is a document QR code, ensure it's registered as public
+      if (qrConfig.type === 'document' && selectedDocument) {
+        PublicDocumentRegistry.registerPublicDocument(selectedDocument);
+      }
+
+      setShowSaveForm(false);
+      setQrCodeName('');
+      
+      // Show floating notification instead of alert
+      setNotification({
+        show: true,
+        type: 'success',
+        title: 'QR Code Saved!',
+        message: `"${savedQRCode.name}" has been saved successfully`
+      });
+    } catch (error) {
+      console.error('Error saving QR code:', error);
+      setNotification({
+        show: true,
+        type: 'error',
+        title: 'Error Saving QR Code',
+        message: 'Failed to save QR code. Please try again.'
+      });
     }
-
-    setShowSaveForm(false);
-    setQrCodeName('');
-    
-    // Show floating notification instead of alert
-    setNotification({
-      show: true,
-      type: 'success',
-      title: 'QR Code Saved!',
-      message: `"${savedQRCode.name}" has been saved successfully`
-    });
   };
 
   const handleQuickGenerate = () => {

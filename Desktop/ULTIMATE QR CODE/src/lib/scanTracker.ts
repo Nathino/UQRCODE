@@ -1,4 +1,5 @@
 import { QRCodeStorage } from './qrStorage';
+import { ScanEventStorage } from './scanEventStorage';
 
 export interface ScanEvent {
   qrCodeId: string;
@@ -7,6 +8,7 @@ export interface ScanEvent {
   userAgent?: string;
   referrer?: string;
   ipAddress?: string;
+  documentId?: string; // For document QR codes
 }
 
 export class ScanTracker {
@@ -15,10 +17,10 @@ export class ScanTracker {
   /**
    * Track a QR code scan
    */
-  static trackScan(qrCodeId: string, userId: string, additionalData?: Partial<ScanEvent>): boolean {
+  static async trackScan(qrCodeId: string, userId: string, additionalData?: Partial<ScanEvent>): Promise<boolean> {
     try {
-      // Increment scan count in QR code storage
-      const success = QRCodeStorage.incrementScanCount(userId, qrCodeId);
+      // Increment scan count in QR code storage (Firestore)
+      const success = await QRCodeStorage.incrementScanCount(userId, qrCodeId);
       
       if (!success) {
         console.warn(`Failed to increment scan count for QR code: ${qrCodeId}`);
@@ -30,13 +32,19 @@ export class ScanTracker {
         qrCodeId,
         userId,
         timestamp: new Date().toISOString(),
-        userAgent: navigator.userAgent,
-        referrer: document.referrer || undefined,
+        userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
+        referrer: typeof document !== 'undefined' ? document.referrer || undefined : undefined,
         ...additionalData
       };
 
-      // Store scan event for analytics
-      this.storeScanEvent(scanEvent);
+      // Store scan event in Firestore (primary) and localStorage (fallback)
+      try {
+        await ScanEventStorage.saveScanEvent(scanEvent);
+      } catch (error) {
+        console.error('Error saving scan event to Firestore, using localStorage fallback:', error);
+        // Fallback to localStorage if Firestore fails
+        this.storeScanEvent(scanEvent);
+      }
 
       return true;
     } catch (error) {
@@ -46,9 +54,28 @@ export class ScanTracker {
   }
 
   /**
-   * Get scan events for a specific QR code
+   * Get scan events for a specific QR code (async - from Firestore)
    */
-  static getScanEvents(userId: string, qrCodeId?: string): ScanEvent[] {
+  static async getScanEvents(userId: string, qrCodeId?: string): Promise<ScanEvent[]> {
+    try {
+      if (qrCodeId) {
+        // Get events for specific QR code from Firestore
+        return await ScanEventStorage.getScanEvents(qrCodeId, userId);
+      } else {
+        // Get all events for user from Firestore
+        return await ScanEventStorage.getUserScanEvents(userId);
+      }
+    } catch (error) {
+      console.error('Error getting scan events from Firestore, falling back to localStorage:', error);
+      // Fallback to localStorage
+      return this.getScanEventsLocal(userId, qrCodeId);
+    }
+  }
+
+  /**
+   * Get scan events from localStorage (fallback)
+   */
+  private static getScanEventsLocal(userId: string, qrCodeId?: string): ScanEvent[] {
     const key = `${this.SCAN_EVENTS_KEY}${userId}`;
     const stored = localStorage.getItem(key);
     
@@ -64,11 +91,11 @@ export class ScanTracker {
   }
 
   /**
-   * Get scan analytics for a user
+   * Get scan analytics for a user (async - from Firestore)
    */
-  static getScanAnalytics(userId: string) {
-    const events = this.getScanEvents(userId);
-    const qrCodes = QRCodeStorage.getUserQRCodes(userId);
+  static async getScanAnalytics(userId: string) {
+    const events = await this.getScanEvents(userId);
+    const qrCodes = await QRCodeStorage.getUserQRCodes(userId);
     
     // Group events by QR code
     const eventsByQR = events.reduce((acc, event) => {
@@ -130,11 +157,12 @@ export class ScanTracker {
   }
 
   /**
-   * Store a scan event
+   * Store a scan event in localStorage (fallback when Firestore fails)
    */
   private static storeScanEvent(event: ScanEvent): void {
     const key = `${this.SCAN_EVENTS_KEY}${event.userId}`;
-    const existing = this.getScanEvents(event.userId);
+    // Use the synchronous localStorage method instead of async Firestore method
+    const existing = this.getScanEventsLocal(event.userId);
     const updated = [...existing, event];
     
     // Keep only last 1000 events to prevent storage bloat

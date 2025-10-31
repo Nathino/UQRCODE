@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { ConfirmationDialog } from '@/components/ui/ConfirmationDialog';
 import { QRCodeStorage, SavedQRCode, QRCodeStats } from '@/lib/qrStorage';
+import { QRCodeFirestore } from '@/lib/qrCodeFirestore';
 import { QRType } from './types';
 import { generateQRData } from './utils';
 import { 
@@ -50,25 +51,52 @@ export function QRCodeDashboard({ userId, onQRCodeSelect, onBack }: QRCodeDashbo
   // Load QR codes on mount
   useEffect(() => {
     loadQRCodes();
+    
+    // Subscribe to real-time updates
+    const unsubscribe = QRCodeFirestore.subscribeToUserQRCodes(userId, (updatedCodes) => {
+      setQrCodes(updatedCodes);
+      // Update stats when codes change
+      QRCodeFirestore.getQRCodeStats(userId).then(setStats);
+    });
+    
+    return () => unsubscribe();
   }, [userId]);
 
   // Apply filters when codes or filters change
   useEffect(() => {
-    applyFilters();
+    applyFilters().catch(error => {
+      console.error('Error applying filters:', error);
+    });
   }, [qrCodes, searchQuery, filterType, filterStatus]);
 
-  const loadQRCodes = () => {
-    const codes = QRCodeStorage.getUserQRCodes(userId);
-    setQrCodes(codes);
-    setStats(QRCodeStorage.getQRCodeStats(userId));
+  const loadQRCodes = async () => {
+    try {
+      const codes = await QRCodeStorage.getUserQRCodes(userId);
+      setQrCodes(codes);
+      const statsData = await QRCodeStorage.getQRCodeStats(userId);
+      setStats(statsData);
+    } catch (error) {
+      console.error('Error loading QR codes:', error);
+    }
   };
 
-  const applyFilters = () => {
+  const applyFilters = async () => {
     let filtered = [...qrCodes];
 
     // Apply search filter
     if (searchQuery) {
-      filtered = QRCodeStorage.searchQRCodes(userId, searchQuery);
+      try {
+        filtered = await QRCodeStorage.searchQRCodes(userId, searchQuery);
+      } catch (error) {
+        // Fallback to local filtering
+        const lowercaseQuery = searchQuery.toLowerCase();
+        filtered = filtered.filter(code => 
+          code.name.toLowerCase().includes(lowercaseQuery) ||
+          code.type.toLowerCase().includes(lowercaseQuery) ||
+          code.data.toLowerCase().includes(lowercaseQuery) ||
+          code.tags?.some(tag => tag.toLowerCase().includes(lowercaseQuery))
+        );
+      }
     }
 
     // Apply type filter
@@ -87,9 +115,10 @@ export function QRCodeDashboard({ userId, onQRCodeSelect, onBack }: QRCodeDashbo
   const handleToggleStatus = async (qrCodeId: string) => {
     setIsLoading(true);
     try {
-      const success = QRCodeStorage.toggleQRCodeStatus(userId, qrCodeId);
+      const success = await QRCodeStorage.toggleQRCodeStatus(userId, qrCodeId);
       if (success) {
-        loadQRCodes();
+        // Codes will be updated via subscription
+        await loadQRCodes();
       }
     } catch (error) {
       console.error('Error toggling QR code status:', error);
@@ -114,9 +143,9 @@ export function QRCodeDashboard({ userId, onQRCodeSelect, onBack }: QRCodeDashbo
 
     setIsLoading(true);
     try {
-      const success = QRCodeStorage.deleteQRCode(userId, confirmationDialog.qrCodeId);
+      const success = await QRCodeStorage.deleteQRCode(userId, confirmationDialog.qrCodeId);
       if (success) {
-        loadQRCodes();
+        // Codes will be updated via subscription
         if (selectedCode?.id === confirmationDialog.qrCodeId) {
           setSelectedCode(null);
         }
@@ -133,9 +162,9 @@ export function QRCodeDashboard({ userId, onQRCodeSelect, onBack }: QRCodeDashbo
     }
   };
 
-  const handleDownloadQRCode = (qrCode: SavedQRCode) => {
-    QRCodeStorage.incrementDownloadCount(userId, qrCode.id);
-    loadQRCodes();
+  const handleDownloadQRCode = async (qrCode: SavedQRCode) => {
+    await QRCodeStorage.incrementDownloadCount(userId, qrCode.id);
+    // Codes will be updated via subscription
 
     // Create download link
     const canvas = document.createElement('canvas');
@@ -175,8 +204,8 @@ export function QRCodeDashboard({ userId, onQRCodeSelect, onBack }: QRCodeDashbo
     }, 100);
   };
 
-  const handleExportAll = () => {
-    const data = QRCodeStorage.exportQRCodes(userId);
+  const handleExportAll = async () => {
+    const data = await QRCodeStorage.exportQRCodes(userId);
     const blob = new Blob([data], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');

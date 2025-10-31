@@ -42,32 +42,40 @@ export function ScanTracker({ onBack, qrCodeId, userId }: ScanTrackerProps) {
       return;
     }
 
-    // Load QR code data
-    const code = QRCodeStorage.getQRCode(finalUserId, finalQrCodeId);
-    if (!code) {
-      setError('QR code not found');
-      setIsLoading(false);
-      return;
-    }
+    // Load QR code data and track scan (async)
+    const loadQRCode = async () => {
+      try {
+        const code = await QRCodeStorage.getQRCode(finalUserId, finalQrCodeId);
+        if (!code) {
+          setError('QR code not found');
+          setIsLoading(false);
+          return;
+        }
 
-    setQrCode(code);
+        setQrCode(code);
 
-    // Track the scan
-    const success = ScanTrackerLib.trackScan(finalQrCodeId, finalUserId, {
-      userAgent: navigator.userAgent,
-      referrer: document.referrer || undefined
-    });
+        // Track the scan
+        const success = await ScanTrackerLib.trackScan(finalQrCodeId, finalUserId, {
+          userAgent: navigator.userAgent,
+          referrer: document.referrer || undefined
+        });
 
-    if (success) {
-      setScanTracked(true);
-      // Update the QR code with new scan count
-      const updatedCode = QRCodeStorage.getQRCode(finalUserId, finalQrCodeId);
-      if (updatedCode) {
-        setQrCode(updatedCode);
+        if (success) {
+          setScanTracked(true);
+          // Update the QR code with new scan count
+          const updatedCode = await QRCodeStorage.getQRCode(finalUserId, finalQrCodeId);
+          if (updatedCode) {
+            setQrCode(updatedCode);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading or tracking QR code:', error);
+      } finally {
+        setIsLoading(false);
       }
-    }
-
-    setIsLoading(false);
+    };
+    
+    loadQRCode();
   }, [finalQrCodeId, finalUserId]);
 
   const handleRedirect = () => {

@@ -54,8 +54,15 @@ export function QRDisplay({ value, fgColor, bgColor, config, disabled, onSave, c
   // Load scan analytics when component mounts
   useEffect(() => {
     if (showAnalytics && qrCodeId && userId) {
-      const analytics = ScanTracker.getScanAnalytics(userId);
-      setScanAnalytics(analytics);
+      const loadAnalytics = async () => {
+        try {
+          const analyticsData = await ScanTracker.getScanAnalytics(userId);
+          setScanAnalytics(analyticsData);
+        } catch (error) {
+          console.error('Error loading scan analytics:', error);
+        }
+      };
+      loadAnalytics();
     }
   }, [showAnalytics, qrCodeId, userId]);
 

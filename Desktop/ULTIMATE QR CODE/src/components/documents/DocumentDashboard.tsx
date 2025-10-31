@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { PDFUpload } from './PDFUpload';
 import { DocumentMetadata } from '@/lib/cloudinary';
 import { PublicDocumentRegistry } from '@/lib/publicDocumentRegistry';
+import { DocumentStorage } from '@/lib/documentStorage';
 import { File, Download, Trash2, QrCode, Eye } from 'lucide-react';
 import { CloudinaryStorage } from '@/lib/cloudinary';
 
@@ -16,18 +17,43 @@ export function DocumentDashboard({ userId, onDocumentSelect }: DocumentDashboar
   const [selectedDocument, setSelectedDocument] = useState<DocumentMetadata | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Load documents from localStorage (in a real app, this would be from a database)
+  // Load documents from Firestore and migrate from localStorage if needed
   useEffect(() => {
-    const savedDocuments = localStorage.getItem(`documents_${userId}`);
-    if (savedDocuments) {
-      setDocuments(JSON.parse(savedDocuments));
+    const loadDocuments = async () => {
+      try {
+        // Migrate from localStorage if needed
+        await DocumentStorage.migrateFromLocalStorage(userId);
+        
+        // Load from Firestore
+        const firestoreDocuments = await DocumentStorage.getUserDocuments(userId);
+        setDocuments(firestoreDocuments);
+      } catch (error) {
+        console.error('Error loading documents:', error);
+      }
+    };
+
+    if (userId) {
+      loadDocuments();
+      
+      // Subscribe to real-time updates
+      const unsubscribe = DocumentStorage.subscribeToUserDocuments(userId, (updatedDocuments) => {
+        setDocuments(updatedDocuments);
+      });
+      
+      return () => unsubscribe();
     }
   }, [userId]);
 
-  const handleUploadSuccess = (document: DocumentMetadata) => {
-    const newDocuments = [...documents, document];
-    setDocuments(newDocuments);
-    localStorage.setItem(`documents_${userId}`, JSON.stringify(newDocuments));
+  const handleUploadSuccess = async (document: DocumentMetadata) => {
+    try {
+      // Save to Firestore
+      await DocumentStorage.saveDocument(userId, document);
+      // Documents will be updated automatically via the subscription
+    } catch (error) {
+      console.error('Error saving document:', error);
+      // Still update local state even if Firestore fails
+      setDocuments(prev => [...prev, document]);
+    }
   };
 
   const handleDeleteDocument = async (documentId: string) => {
@@ -36,14 +62,15 @@ export function DocumentDashboard({ userId, onDocumentSelect }: DocumentDashboar
 
     setIsLoading(true);
     try {
+      // Delete from Cloudinary first
       const success = await CloudinaryStorage.deleteDocument(document.publicId);
       if (success) {
         // Remove from public registry if it exists
         PublicDocumentRegistry.removePublicDocument(documentId);
         
-        const updatedDocuments = documents.filter(doc => doc.id !== documentId);
-        setDocuments(updatedDocuments);
-        localStorage.setItem(`documents_${userId}`, JSON.stringify(updatedDocuments));
+        // Delete from Firestore
+        await DocumentStorage.deleteDocument(documentId);
+        // Documents will be updated automatically via the subscription
         
         if (selectedDocument?.id === documentId) {
           setSelectedDocument(null);
