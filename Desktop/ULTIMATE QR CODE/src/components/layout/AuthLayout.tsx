@@ -16,7 +16,7 @@ export function AuthLayout({ children, onSignOut, onProfileClick, onAdminClick }
 
   return (
     <div className="relative">
-      <div className="absolute top-6 right-2 sm:top-4 sm:right-4 flex items-center space-x-2 z-50">
+      <div className="absolute top-4 right-4 sm:top-4 sm:right-6 flex items-center space-x-2 z-50">
         {onProfileClick && (
           <Button
             onClick={onProfileClick}

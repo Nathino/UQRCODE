@@ -1,6 +1,7 @@
 import { 
   doc, 
   setDoc, 
+  updateDoc,
   getDoc,
   DocumentData,
   Timestamp
@@ -112,6 +113,8 @@ export class UserProfileService {
           totalScans: existingData.totalScans || 0,
           totalDownloads: existingData.totalDownloads || 0
         };
+        // Use updateDoc for existing documents
+        await updateDoc(docRef, toFirestoreFormat(profile));
       } else {
         // Create new profile
         profile = {
@@ -126,9 +129,10 @@ export class UserProfileService {
           totalScans: 0,
           totalDownloads: 0
         };
+        // Use setDoc for new documents
+        await setDoc(docRef, toFirestoreFormat(profile));
       }
       
-      await setDoc(docRef, toFirestoreFormat(profile), { merge: true });
       return profile;
     } catch (error) {
       console.error('Error creating/updating user profile:', error);
@@ -175,7 +179,8 @@ export class UserProfileService {
         updatedAt: Timestamp.fromDate(new Date())
       };
       
-      await setDoc(docRef, updateData, { merge: true });
+      // Use updateDoc since the document should exist when updating stats
+      await updateDoc(docRef, updateData);
     } catch (error) {
       console.error('Error updating profile stats:', error);
       throw error;

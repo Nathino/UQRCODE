@@ -9,13 +9,21 @@ service cloud.firestore {
     
     // Users collection - users can read their own profile, admin can read all
     match /users/{userId} {
-      // Allow create/update if user owns the profile
-      allow create, update: if request.auth != null && 
-        (request.auth.uid == userId || isAdmin());
+      // Helper function to check if user owns this profile
+      function isOwner() {
+        return request.auth != null && request.auth.uid == userId;
+      }
+      
+      // Allow create if user owns the profile or is admin
+      allow create: if isOwner() || isAdmin();
+      
+      // Allow update if user owns the profile or is admin
+      // For updates, the document must exist, so resource.data is available
+      allow update: if isOwner() || isAdmin();
       
       // Allow read if user owns the profile or is admin
-      allow read: if request.auth != null && 
-        (request.auth.uid == userId || isAdmin());
+      // This allows reading non-existent documents (returns null)
+      allow read: if isOwner() || isAdmin();
       
       // Allow delete only for admin
       allow delete: if isAdmin();

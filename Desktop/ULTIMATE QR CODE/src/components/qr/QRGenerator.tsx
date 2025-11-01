@@ -19,7 +19,7 @@ const initialQRConfig: QRConfig = {
   type: '',
   data: '',
   style: 'squares',
-  errorCorrection: 'M',
+  errorCorrection: 'L',
   gradient: {
     enabled: false,
     colors: ['#6366f1', '#8b5cf6'],
@@ -276,7 +276,7 @@ export function QRGenerator() {
       </div>
 
       {/* Professional Header */}
-      <div className="max-w-7xl mx-auto mb-8 relative z-10">
+      <div className="max-w-7xl mx-auto mb-8 relative z-10 pt-6 sm:pt-8">
         <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4">
           <div>
             <h1 className="text-3xl lg:text-5xl font-bold text-white mb-2">

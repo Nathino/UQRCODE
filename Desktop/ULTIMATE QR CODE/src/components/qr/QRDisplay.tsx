@@ -79,7 +79,7 @@ export function QRDisplay({ value, fgColor, bgColor, config, disabled, onSave, c
       <QRCode
         value={value || ''}
         size={downloadSize}
-        level={config?.errorCorrection || 'H'} // Using highest error correction for downloads
+        level={config?.errorCorrection || 'L'} // Using config's error correction level for downloads
         fgColor={fgColor}
         bgColor={bgColor}
         imageSettings={config?.logo ? {
@@ -187,7 +187,7 @@ export function QRDisplay({ value, fgColor, bgColor, config, disabled, onSave, c
     <QRCode
       value={value || ''}
       size={displaySize} // Smaller size for mobile displays
-      level={config?.errorCorrection || 'M'}
+      level={config?.errorCorrection || 'L'}
       fgColor={fgColor}
       bgColor={bgColor}
       imageSettings={config?.logo ? {

@@ -92,7 +92,7 @@ export const QR_TEMPLATES: QRTemplate[] = [
     style: 'rounded',
     fgColor: '#000000',
     bgColor: '#ffffff',
-    errorCorrection: 'H',
+    errorCorrection: 'M',
     gradient: {
       enabled: true,
       colors: ['#6366f1', '#8b5cf6'],
@@ -113,7 +113,7 @@ export const QR_TEMPLATES: QRTemplate[] = [
     style: 'classy',
     fgColor: '#1e40af',
     bgColor: '#ffffff',
-    errorCorrection: 'Q',
+    errorCorrection: 'M',
     gradient: {
       enabled: true,
       colors: ['#1e40af', '#3b82f6'],
@@ -126,7 +126,7 @@ export const QR_TEMPLATES: QRTemplate[] = [
     style: 'edges',
     fgColor: '#000000',
     bgColor: '#ffffff',
-    errorCorrection: 'H',
+    errorCorrection: 'M',
     gradient: {
       enabled: true,
       colors: ['#f59e0b', '#ef4444', '#ec4899'],
