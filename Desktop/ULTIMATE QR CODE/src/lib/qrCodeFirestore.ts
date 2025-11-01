@@ -232,10 +232,33 @@ export class QRCodeFirestore {
       const codes = await this.getUserQRCodes(userId);
       // Find QR code that points to this document
       const documentUrl = `${window.location.origin}/document/${documentId}`;
-      return codes.find(code => 
-        code.type === 'document' && 
-        (code.data.includes(documentId) || code.data === documentUrl)
-      ) || null;
+      const documentUrlWithQuery = `${documentUrl}?url=`;
+      
+      // Try to find QR code that matches the document
+      const foundCode = codes.find(qrCode => {
+        if (qrCode.type !== 'document') return false;
+        
+        // Check if data exactly matches the document URL (with or without query params)
+        if (qrCode.data === documentUrl) return true;
+        if (qrCode.data.startsWith(documentUrlWithQuery)) return true;
+        
+        // Check if data contains the document ID (handles various URL formats)
+        // Extract the document ID from the QR code data URL
+        const urlMatch = qrCode.data.match(/\/document\/([^/?]+)/);
+        const qrCodeDocumentId = urlMatch ? urlMatch[1] : null;
+        
+        if (qrCodeDocumentId === documentId) return true;
+        
+        // Fallback: check if data includes the document ID string
+        // But be careful - this could match partial IDs, so we prefer exact matches above
+        if (qrCode.data.includes(`/document/${documentId}`)) return true;
+        if (qrCode.data.includes(`document/${documentId}`)) return true;
+        
+        return false;
+      });
+      
+      
+      return foundCode || null;
     } catch (error) {
       console.error('Error finding QR code by document ID:', error);
       return null;

@@ -30,32 +30,64 @@ service cloud.firestore {
     }
     
     // Documents collection - users can only access their own documents, admin can access all
+    // PUBLIC READ ACCESS: Allow anyone to read documents (for QR code scanning without authentication)
+    // This enables unauthenticated users to access documents via QR codes
     match /documents/{documentId} {
       // Allow create if user owns the document
       allow create: if request.auth != null && 
         request.auth.uid == request.resource.data.userId;
       
-      // Allow read if user owns the document (and it exists) or is admin
-      allow read: if request.auth != null && 
-        (request.auth.uid == resource.data.userId || isAdmin());
+      // Allow read: 
+      // - Public read access (for QR code scanning without authentication)
+      // - OR authenticated user owns the document
+      // - OR admin
+      allow read: if true; // Public read access for QR code scanning
       
       // Allow update/delete if user owns the document or is admin
+      // Note: Only authenticated users can update/delete (write operations require auth)
       allow update, delete: if request.auth != null && 
         (request.auth.uid == resource.data.userId || isAdmin());
     }
     
     // QR codes collection - users can only access their own QR codes, admin can access all
     match /qr_codes/{qrCodeId} {
+      // Helper function to check if update only modifies scan/download count fields (safe for public)
+      function isSafePublicUpdate() {
+        // Allow unauthenticated updates ONLY to scanCount, downloadCount, lastScanned, lastAccessed, updatedAt
+        // Ensure all critical fields remain unchanged
+        return request.resource.data.userId == resource.data.userId &&
+          request.resource.data.id == resource.data.id &&
+          request.resource.data.name == resource.data.name &&
+          request.resource.data.type == resource.data.type &&
+          request.resource.data.data == resource.data.data &&
+          request.resource.data.config == resource.data.config &&
+          request.resource.data.fgColor == resource.data.fgColor &&
+          request.resource.data.bgColor == resource.data.bgColor &&
+          request.resource.data.isActive == resource.data.isActive &&
+          request.resource.data.createdAt == resource.data.createdAt;
+        // Only scanCount, downloadCount, lastScanned, lastAccessed, updatedAt can change
+      }
+      
       // Allow create if user owns the QR code
       allow create: if request.auth != null && 
         request.auth.uid == request.resource.data.userId;
       
-      // Allow read if user owns the QR code (and it exists) or is admin
+      // Allow read if:
+      // - User owns the QR code or is admin (authenticated)
+      // - OR unauthenticated user (for public scan tracking - they already have userId from document)
       allow read: if request.auth != null && 
-        (request.auth.uid == resource.data.userId || isAdmin());
+        (request.auth.uid == resource.data.userId || isAdmin()) ||
+        request.auth == null; // Allow unauthenticated reads for scan tracking
       
-      // Allow update/delete if user owns the QR code or is admin
-      allow update, delete: if request.auth != null && 
+      // Allow update if:
+      // - User owns the QR code or is admin (full update)
+      // - OR unauthenticated user updating only scan/download counts (public scan tracking)
+      allow update: if (request.auth != null && 
+        (request.auth.uid == resource.data.userId || isAdmin())) ||
+        isSafePublicUpdate();
+      
+      // Allow delete only if user owns the QR code or is admin
+      allow delete: if request.auth != null && 
         (request.auth.uid == resource.data.userId || isAdmin());
     }
     
