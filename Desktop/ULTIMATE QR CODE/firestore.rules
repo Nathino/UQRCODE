@@ -1,49 +1,70 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Documents collection - users can only access their own documents
+    // Helper function to check if user is admin
+    function isAdmin() {
+      return request.auth != null && 
+        request.auth.token.email == 'adminannektech@gmail.com';
+    }
+    
+    // Users collection - users can read their own profile, admin can read all
+    match /users/{userId} {
+      // Allow create/update if user owns the profile
+      allow create, update: if request.auth != null && 
+        (request.auth.uid == userId || isAdmin());
+      
+      // Allow read if user owns the profile or is admin
+      allow read: if request.auth != null && 
+        (request.auth.uid == userId || isAdmin());
+      
+      // Allow delete only for admin
+      allow delete: if isAdmin();
+    }
+    
+    // Documents collection - users can only access their own documents, admin can access all
     match /documents/{documentId} {
       // Allow create if user owns the document
       allow create: if request.auth != null && 
         request.auth.uid == request.resource.data.userId;
       
-      // Allow read if user owns the document (and it exists)
+      // Allow read if user owns the document (and it exists) or is admin
       allow read: if request.auth != null && 
-        request.auth.uid == resource.data.userId;
+        (request.auth.uid == resource.data.userId || isAdmin());
       
-      // Allow update/delete if user owns the document
+      // Allow update/delete if user owns the document or is admin
       allow update, delete: if request.auth != null && 
-        request.auth.uid == resource.data.userId;
+        (request.auth.uid == resource.data.userId || isAdmin());
     }
     
-    // QR codes collection - users can only access their own QR codes
+    // QR codes collection - users can only access their own QR codes, admin can access all
     match /qr_codes/{qrCodeId} {
       // Allow create if user owns the QR code
       allow create: if request.auth != null && 
         request.auth.uid == request.resource.data.userId;
       
-      // Allow read if user owns the QR code (and it exists)
+      // Allow read if user owns the QR code (and it exists) or is admin
       allow read: if request.auth != null && 
-        request.auth.uid == resource.data.userId;
+        (request.auth.uid == resource.data.userId || isAdmin());
       
-      // Allow update/delete if user owns the QR code
+      // Allow update/delete if user owns the QR code or is admin
       allow update, delete: if request.auth != null && 
-        request.auth.uid == resource.data.userId;
+        (request.auth.uid == resource.data.userId || isAdmin());
     }
     
-    // Scan events collection - users can only access their own scan events
+    // Scan events collection - users can only access their own scan events, admin can access all
     match /scan_events/{eventId} {
       // Allow create for authenticated users OR if userId is provided (for public document scans)
       // Note: For public document scans, we trust the userId in the request
       allow create: if request.auth != null || 
         (request.resource.data.userId != null && request.resource.data.qrCodeId != null);
       
-      // Allow read if user owns the scan event (must be authenticated)
+      // Allow read if user owns the scan event (must be authenticated) or is admin
       allow read: if request.auth != null && 
-        request.auth.uid == resource.data.userId;
+        (request.auth.uid == resource.data.userId || isAdmin());
       
       // Users can only read their own scan events, cannot update/delete
-      allow update, delete: if false;
+      // Admin can update/delete
+      allow update, delete: if isAdmin();
     }
     
     // Deny all other access

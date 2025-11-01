@@ -414,6 +414,7 @@ export class QRCodeFirestore {
 
   /**
    * Migrate QR codes from localStorage to Firestore
+   * Only clears localStorage after verifying all codes are successfully saved
    */
   static async migrateFromLocalStorage(userId: string): Promise<void> {
     try {
@@ -426,15 +427,44 @@ export class QRCodeFirestore {
       
       const codes: SavedQRCode[] = JSON.parse(savedCodes);
       
-      // Check if codes already exist in Firestore
-      const existingCodes = await this.getUserQRCodes(userId);
-      const existingIds = new Set(existingCodes.map(code => code.id));
+      if (!codes || codes.length === 0) {
+        // Clear empty localStorage
+        localStorage.removeItem(localStorageKey);
+        return;
+      }
       
-      // Only migrate codes that don't exist in Firestore
+      // Check if codes already exist in Firestore (use direct Firestore query to avoid recursion)
+      let existingCodes: SavedQRCode[] = [];
+      try {
+        const q = query(
+          collection(db, QR_CODES_COLLECTION),
+          where('userId', '==', userId)
+        );
+        const querySnapshot = await getDocs(q);
+        querySnapshot.forEach((docSnap) => {
+          existingCodes.push(fromFirestoreFormat(docSnap));
+        });
+      } catch (error) {
+        console.error('Error checking existing codes during migration:', error);
+      }
+      
+      // Create a set of existing code identifiers (by content, not ID, since IDs change on save)
+      const existingCodeIdentifiers = new Set(
+        existingCodes.map(code => `${code.name}|${code.type}|${code.data}|${code.userId}`)
+      );
+      
+      // Track successfully migrated codes
+      const successfullyMigrated: string[] = [];
+      const failedCodes: string[] = [];
+      
+      // Only migrate codes that don't exist in Firestore (check by content, not ID)
       for (const code of codes) {
-        if (!existingIds.has(code.id)) {
+        const codeIdentifier = `${code.name}|${code.type}|${code.data}|${code.userId}`;
+        
+        // Check if a code with the same content already exists in Firestore
+        if (!existingCodeIdentifiers.has(codeIdentifier)) {
           try {
-            await this.saveQRCode({
+            const savedQRCode = await this.saveQRCode({
               name: code.name,
               type: code.type,
               data: code.data,
@@ -446,17 +476,41 @@ export class QRCodeFirestore {
               tags: code.tags,
               description: code.description
             });
+            // Verify the code was actually saved to Firestore by reading it back with the new ID
+            const verifiedCode = await this.getQRCode(savedQRCode.id);
+            if (verifiedCode) {
+              successfullyMigrated.push(code.id);
+              // Add the new code identifier to prevent duplicate migrations
+              existingCodeIdentifiers.add(codeIdentifier);
+            } else {
+              failedCodes.push(code.id);
+            }
           } catch (error) {
             console.error(`Error migrating QR code ${code.id}:`, error);
+            failedCodes.push(code.id);
           }
+        } else {
+          // Code already exists in Firestore (by content), mark as successfully migrated
+          successfullyMigrated.push(code.id);
         }
       }
       
-      // Clear localStorage after successful migration
-      localStorage.removeItem(localStorageKey);
+      // Only clear localStorage if ALL codes were successfully migrated OR already exist in Firestore
+      if (failedCodes.length === 0) {
+        localStorage.removeItem(localStorageKey);
+      } else {
+        // Keep codes in localStorage that failed to migrate
+        const remainingCodes = codes.filter(code => failedCodes.includes(code.id));
+        if (remainingCodes.length > 0) {
+          localStorage.setItem(localStorageKey, JSON.stringify(remainingCodes));
+        } else {
+          localStorage.removeItem(localStorageKey);
+        }
+      }
     } catch (error) {
       console.error('Error migrating QR codes from localStorage:', error);
       // Don't throw - migration failure shouldn't break the app
+      // Don't clear localStorage on error - preserve user data
     }
   }
 

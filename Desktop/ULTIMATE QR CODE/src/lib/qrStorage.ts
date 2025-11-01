@@ -38,14 +38,33 @@ export class QRCodeStorage {
 
   /**
    * Save a QR code to Firestore
+   * Always tries Firestore first, and saves to localStorage as backup only if Firestore fails
    */
   static async saveQRCode(qrCode: Omit<SavedQRCode, 'id' | 'createdAt' | 'updatedAt' | 'downloadCount' | 'scanCount'>): Promise<SavedQRCode> {
     try {
       const savedQRCode = await QRCodeFirestore.saveQRCode(qrCode);
+      
+      // Verify the code was actually saved to Firestore by reading it back
+      const verifiedCode = await QRCodeFirestore.getQRCode(savedQRCode.id);
+      if (!verifiedCode) {
+        throw new Error('QR code was not saved to Firestore');
+      }
+      
+      // Also save to localStorage as backup
+      const existingCodes = this.getUserQRCodesLocal(qrCode.userId);
+      const codeExists = existingCodes.some(code => code.id === savedQRCode.id);
+      if (!codeExists) {
+        const updatedCodes = [...existingCodes, savedQRCode];
+        localStorage.setItem(
+          `${this.STORAGE_KEY_PREFIX}${qrCode.userId}`, 
+          JSON.stringify(updatedCodes)
+        );
+      }
+      
       return savedQRCode;
     } catch (error) {
-      console.error('Error saving QR code to Firestore, falling back to localStorage:', error);
-      // Fallback to localStorage
+      console.error('Error saving QR code to Firestore, saving to localStorage as backup:', error);
+      // Fallback to localStorage ONLY if Firestore completely fails
       const id = this.generateId();
       const now = new Date().toISOString();
       
@@ -73,19 +92,45 @@ export class QRCodeStorage {
 
   /**
    * Get all QR codes for a user from Firestore (async)
+   * Merges Firestore codes with localStorage codes to ensure no data loss
    */
   static async getUserQRCodes(userId: string): Promise<SavedQRCode[]> {
     try {
-      // Migrate from localStorage if needed
+      // Try to get codes from Firestore first
+      const firestoreCodes = await QRCodeFirestore.getUserQRCodes(userId);
+      
+      // Get codes from localStorage as backup
+      const localCodes = this.getUserQRCodesLocal(userId);
+      
+      // Merge: Firestore codes take priority, but add any localStorage codes that don't exist in Firestore
+      const firestoreIds = new Set(firestoreCodes.map(code => code.id));
+      const localOnlyCodes = localCodes.filter(code => !firestoreIds.has(code.id));
+      
+      // Migrate any localStorage-only codes to Firestore
+      if (localOnlyCodes.length > 0) {
+        await QRCodeFirestore.migrateFromLocalStorage(userId);
+        // Re-fetch after migration to get updated list
+        const updatedFirestoreCodes = await QRCodeFirestore.getUserQRCodes(userId);
+        this.firestoreCache.set(userId, updatedFirestoreCodes);
+        return updatedFirestoreCodes;
+      }
+      
+      // Migrate from localStorage if needed (handles general migration)
       await QRCodeFirestore.migrateFromLocalStorage(userId);
       
-      const codes = await QRCodeFirestore.getUserQRCodes(userId);
-      this.firestoreCache.set(userId, codes);
-      return codes;
+      this.firestoreCache.set(userId, firestoreCodes);
+      return firestoreCodes;
     } catch (error) {
       console.error('Error getting QR codes from Firestore, falling back to localStorage:', error);
       // Fallback to localStorage
-      return this.getUserQRCodesLocal(userId);
+      const localCodes = this.getUserQRCodesLocal(userId);
+      
+      // Try to migrate localStorage codes to Firestore in the background
+      QRCodeFirestore.migrateFromLocalStorage(userId).catch(() => {
+        // Migration failed, but we still return localStorage codes
+      });
+      
+      return localCodes;
     }
   }
 

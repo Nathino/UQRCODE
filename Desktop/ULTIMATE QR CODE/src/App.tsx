@@ -6,19 +6,41 @@ import { QRGenerator } from './components/qr/QRGenerator';
 import { DocumentViewer } from './components/documents/DocumentViewer';
 import { PublicDocumentViewer } from './components/documents/PublicDocumentViewer';
 import { AuthLayout } from './components/layout/AuthLayout';
+import { UserProfile } from './components/profile/UserProfile';
+import { AdminDashboard } from './components/admin/AdminDashboard';
 import { useState, useEffect } from 'react';
 import { DocumentMetadata } from './lib/cloudinary';
 import { DocumentStorage } from './lib/documentStorage';
+import { UserProfileService } from './lib/userProfile';
 
 export default function App() {
   const { user, loading } = useAuth();
-  const [currentView, setCurrentView] = useState<'generator' | 'document' | 'public-document'>('generator');
+  const [currentView, setCurrentView] = useState<'generator' | 'document' | 'public-document' | 'profile' | 'admin'>('generator');
   const [selectedDocument, setSelectedDocument] = useState<DocumentMetadata | null>(null);
   const [publicDocumentId, setPublicDocumentId] = useState<string | null>(null);
 
   const handleSignOut = () => {
     signOut(auth);
   };
+
+  // Create/update user profile on login
+  useEffect(() => {
+    const createUserProfile = async () => {
+      if (user) {
+        try {
+          await UserProfileService.createOrUpdateProfile(
+            user.uid,
+            user.email || '',
+            user.displayName || undefined
+          );
+        } catch (error) {
+          console.error('Error creating/updating user profile:', error);
+        }
+      }
+    };
+
+    createUserProfile();
+  }, [user]);
 
   // Check URL for document viewing
   useEffect(() => {
@@ -58,6 +80,22 @@ export default function App() {
     window.history.pushState({}, '', '/');
   };
 
+  const handleProfileClick = () => {
+    setCurrentView('profile');
+  };
+
+  const handleAdminClick = () => {
+    setCurrentView('admin');
+  };
+
+  const handleBackFromProfile = () => {
+    setCurrentView('generator');
+  };
+
+  const handleBackFromAdmin = () => {
+    setCurrentView('generator');
+  };
+
   // Handle public document access (no authentication required)
   if (currentView === 'public-document' && publicDocumentId) {
     return <PublicDocumentViewer documentId={publicDocumentId} />;
@@ -86,9 +124,27 @@ export default function App() {
     </div>;
   }
 
+  // Show profile view
+  if (currentView === 'profile') {
+    return (
+      <AuthLayout onSignOut={handleSignOut} onProfileClick={handleProfileClick} onAdminClick={handleAdminClick}>
+        <UserProfile onBack={handleBackFromProfile} />
+      </AuthLayout>
+    );
+  }
+
+  // Show admin dashboard view
+  if (currentView === 'admin') {
+    return (
+      <AuthLayout onSignOut={handleSignOut} onProfileClick={handleProfileClick} onAdminClick={handleAdminClick}>
+        <AdminDashboard onBack={handleBackFromAdmin} />
+      </AuthLayout>
+    );
+  }
+
   // Show main app for authenticated users
   return (
-    <AuthLayout onSignOut={handleSignOut}>
+    <AuthLayout onSignOut={handleSignOut} onProfileClick={handleProfileClick} onAdminClick={handleAdminClick}>
       <QRGenerator />
     </AuthLayout>
   );
